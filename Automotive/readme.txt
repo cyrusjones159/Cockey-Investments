@@ -1,1 +1,3 @@
 Auto Data here
+
+Note to Cyrus... Automotive Stocks are In the Industrials Category of the Fidelity Screener.. So you will have to pare them down more....
