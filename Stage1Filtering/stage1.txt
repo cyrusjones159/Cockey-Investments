@@ -1,0 +1,5 @@
+Stage I filtering Suggestions:
+
+Based on Market Cap (>1B < 500B)
+Stock Price (< 200/share)
+Annual Dividends (Stable or Growing)
