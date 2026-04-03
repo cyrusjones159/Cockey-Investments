@@ -16,12 +16,14 @@ A comprehensive stock pricing analysis project for STAT 542, examining investmen
 - **PresentationDocuments/** - Project presentation materials and documentation
 
 ## Contents
-
-Each sector directory includes:
-- Screener results and analysis (`.xls` files)
-- Fidelity sector visualizations
-- Screenshots of options data and sector allocations
-- Individual sector analysis documentation
+### Automotive 
+ - **Automotive Consumer Discretionary/** - [ConsumerDiscretionaryAutoscreener_results.xls](https://github.com/user-attachments/files/26467949/ConsumerDiscretionaryAutoscreener_results.xls)
+ - **Automotive Industrial Screener/** - [IndustrialsScreener_results.xls](https://github.com/user-attachments/files/26467957/IndustrialsScreener_results.xls)
+### Financials
+ - **Financials Screener/** - [FinancialsScreener_results.xls](https://github.com/user-attachments/files/26467974/FinancialsScreener_results.xls)
+### Media 
+ - **Media Entertainment Screener/** - [MediaEntertainmentScreener_results.xls](https://github.com/user-attachments/files/26468009/MediaEntertainmentScreener_results.xls)
+ - **Second Media Screener/** - [screener_results.xls](https://github.com/user-attachments/files/26468012/screener_results.xls)
 
 ## About This Project
 This project utilizes statistical analysis and stock screening techniques to identify potential investment opportunities across diverse market sectors.
