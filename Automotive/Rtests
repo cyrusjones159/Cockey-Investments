@@ -5,5 +5,4 @@ library("tidyverse")
 library("readxl")
 library("here")
 
-df <- read_excel(here("Automotive/ConsumerDiscretionaryAutoscreener_results.xls"))
-read_excel(here("Automotive/ConsumerDiscretionaryAutoscreener_results.xls"))
+
