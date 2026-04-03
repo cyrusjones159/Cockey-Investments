@@ -1,0 +1,9 @@
+#install.packages("readxl")
+#install.packages("tidyverse")
+#install.packages("here")
+library("tidyverse")
+library("readxl")
+library("here")
+
+df <- read_excel(here("Automotive/ConsumerDiscretionaryAutoscreener_results.xls"))
+read_excel(here("Automotive/ConsumerDiscretionaryAutoscreener_results.xls"))
