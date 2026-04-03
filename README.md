@@ -1,5 +1,5 @@
 # Cockey-Investments
-STATS 542 Stock Pricing Data Set Project
+STATS 542 Stock Pricing Data Set Project /n
 Consumer Discretionary AutoScreener xls file: (Auto)
 [ConsumerDiscretionaryAutoscreener_results.xls](https://github.com/user-attachments/files/26467788/ConsumerDiscretionaryAutoscreener_results.xls)
 Industrial Screener xls file: (Auto)
