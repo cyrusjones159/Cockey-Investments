@@ -5,4 +5,13 @@ library("tidyverse")
 library("readxl")
 library("here")
 
+# Read automotive screener results from CSV
+url <- "https://raw.githubusercontent.com/cyrusjones159/Cockey-Investments/main/Automotive/ConsumerDiscretionaryAutoscreener_results.csv"
+automotive_data <- read_csv(url)
+
+# Remove rows 25-41
+automotive_data <- automotive_data[-c(25:41), ]
+
+automotive_data
+print(x = automotive_data, n=25)
 
