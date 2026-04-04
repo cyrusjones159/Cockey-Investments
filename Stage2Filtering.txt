@@ -1,0 +1,83 @@
+Today
+I need an api which can get 10 years of stock prices, and 10 years of dividend prices for major stock tickers in R or Python
+You can absolutely get 10 years of stock prices and dividend history in both Python and R — the easiest and most reliable way is to use a financial data API such as Alpha Vantage, Yahoo Finance–compatible libraries, or paid APIs like Leeway or Finnhub. Below is a clear breakdown of the best options and ready‑to‑use code examples.
+
+📈 Best APIs for 10 Years of Stock Prices + Dividend History
+Here’s a quick comparison to help you choose:
+
+API	10‑yr Prices	10‑yr Dividends	Free Tier	Python Support	R Support	Notes
+Yahoo Finance (yfinance / quantmod)	✔️	✔️	✔️	Excellent	Excellent	Easiest, no API key needed
+Alpha Vantage	✔️	✔️	✔️ (limited)	Excellent	Good	Requires API key
+Finnhub	✔️	✔️	Limited	Excellent	Good	Very reliable
+Leeway API	✔️ (100 yrs)	✔️	Paid	REST	REST	Enterprise-grade
+Polygon.io	✔️	✔️	Paid	Excellent	REST	Great for US markets
+If you want free + simple, Yahoo Finance is the best choice.
+
+🐍 Python: 10 Years of Prices & Dividends (Yahoo Finance)
+python
+import yfinance as yf
+
+ticker = yf.Ticker("AAPL")
+
+# 10 years of daily prices
+prices = ticker.history(period="10y")
+
+# Dividend history
+dividends = ticker.dividends
+
+print(prices.head())
+print(dividends.head())
+Pros:
+
+No API key
+
+Reliable for major tickers
+
+Includes dividends, splits, corporate actions
+
+📊 R: 10 Years of Prices & Dividends (quantmod)
+r
+library(quantmod)
+
+symbol <- "AAPL"
+
+# 10 years of price data
+getSymbols(symbol, from = Sys.Date() - 3650, auto.assign = TRUE)
+prices <- get(symbol)
+
+# Dividend history
+divs <- getDividends(symbol, from = Sys.Date() - 3650)
+
+head(prices)
+head(divs)
+Pros:
+
+Very easy
+
+Built-in dividend retrieval
+
+Works with many tickers
+
+🔑 Python: Using Alpha Vantage (Free API Key)
+python
+import requests
+
+API_KEY = "YOUR_KEY"
+symbol = "AAPL"
+
+# Prices (daily adjusted)
+url_prices = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol={symbol}&apikey={API_KEY}"
+prices = requests.get(url_prices).json()
+
+# Dividends are included in "dividend amount" field
+🧠 Which Should You Choose?
+If you want:
+
+Free + easiest → Yahoo Finance (yfinance / quantmod)
+
+More stable, enterprise-grade → Finnhub or Leeway
+
+US‑focused, high‑quality data → Polygon.io
+
+Want me to generate a full reusable Python or R script for multiple tickers (e.g., S&P 500)?
+I can also package it into a function or class for you.
