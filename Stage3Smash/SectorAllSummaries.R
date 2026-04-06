@@ -9,6 +9,8 @@ install.packages("quantmod")
 install.packages("purrr")
 install.packages("lubridate")
 install.packages("tidyr")
+install.packages("writexl")
+library(writexl)
 library(lubridate)
 library(tidyr)
 library(quantmod)
@@ -141,3 +143,5 @@ result5 <- result4 %>%
   )
 result5
 print(result5)
+# WRITE THE RESULTS BACK TO DISK
+write_xlsx(result5, "c:/users/stritzj/Documents/542/financials.result.xlsx")
