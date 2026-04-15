@@ -22,19 +22,45 @@ library(wget) #THIS REQUIRES WGET ON YOU MAC OR WINDOWS BEING INSTALLED... OTHER
 library(dplyr)
 library(sqldf)
 library(janitor)
+#PART1-> WE USED FIDELITY INVESTMENTS STOCK SCREENER TO PARE DOWN TARGET INVESTMENTS (SEE SCREENSHOTS FOR DETAILS)
+#PART2 -> PROCESS AND DOWNLOAD ALL FILES LOCALLY (SOURCE PATH-> DESTINATION PATH)
 download.file("https://cyrusjones159.github.io/Cockey-Investments/Financials/FinancialsScreener_results.xls", "c:\\users\\stritzj\\Documents\\542\\financials2.xls", mode = "wb")
+download.file("https://cyrusjones159.github.io/Cockey-Investments/Automotive/ConsumerDiscretionaryAutoscreener_results.xls", "c:\\users\\stritzj\\Documents\\542\\autos2.xls", mode = "wb")
+download.file("https://cyrusjones159.github.io/Cockey-Investments/Automotive/IndustrialsScreener_results.xls", "c:\\users\\stritzj\\Documents\\542\\industrials2.xls", mode = "wb")
+download.file("https://cyrusjones159.github.io/Cockey-Investments/Healthcare/HCscreener_results.xls", "c:\\users\\stritzj\\Documents\\542\\health2.xls", mode = "wb")
+download.file("https://cyrusjones159.github.io/Cockey-Investments/Media/MediaEntertainmentScreener_results.xls", "c:\\users\\stritzj\\Documents\\542\\media2.xls", mode = "wb")
+#PART2 -> You need to open the file and save it as Excel97 File with a Different Name....as the Wickham plugin isnt so great(It requires old Excel Versions- SaveAs in Excel)....OR you can you wget instead of download.
+#PART2A-> I am going into the downloaded files and opening them in Excel and resaving them in 97 Version with a different file name... and wala they work again.... Maybe CSV is a better call but.. no Wickham...:)
 mydf <- read_excel("c:/users/stritzj/Documents/542/financials3.xls")
+mydf2 <- read_excel("c:/users/stritzj/Documents/542/autos3.xls")
+mydf3 <- read_excel("c:/users/stritzj/Documents/542/industrials3.xls")
+mydf4 <- read_excel("c:/users/stritzj/Documents/542/health3.xls")
+mydf5 <- read_excel("c:/users/stritzj/Documents/542/media3.xls")
 head(mydf, 5)
+head(mydf2, 5)
+head(mydf3, 5)
+head(mydf4, 5)
+head(mydf5, 5)
 str(mydf)
 
+### THE DATA FRAME COMES BACK WITH UNCLEAN NAMES CLEAN NAMES IS PART OF THE JANITOR FUNCTION LIBRARY I LOADED EARLIER.
 mydf2 <- clean_names(mydf)
 head(mydf2, 5)
+#### MYDF2 SHOULD BE A DATAFRAME VERSION OF THE ORIGINAL STOCK SCREENER IT HAS LOTS OF EXTRANEOUS COLUMNS OBVIOUSLY AS WE ONLY NEED THE TICKERS....
+
+##### THIS STEP IS JUST TO GET A FEEL FOR THE DATA SET TO GIVE YOU CONFIDENCE WE ARE NOT WILD AND CRAZY.
 result <- sqldf("SELECT * FROM mydf2 WHERE company_name = 'Bank OZK'")
-result2 <- sqldf("SELECT symbol, dividend_yield FROM mydf2 WHERE dividend_yield > 4 Order by dividend_yield DESC")
 head(result,5)
-result2
-tickers <- as.vector(result2$symbol)
-tickers
+#### IDECIDED FOR MY DATA TO FURTHER RESTRICT TO REALLY HIGH DIVIDEND YIELDS... AS THIS MAKES A 40% RETURN OVER 10 YEARS EVEN IF THE STOCK IS FLAT.
+result2 <- sqldf("SELECT symbol, dividend_yield FROM mydf2 WHERE dividend_yield > 4 Order by dividend_yield DESC")
+#### RESULT2 THEN IS MY FINANCIAL SELECTION.....
+result2   # RETURNS THE PARED DOWN LIST
+tickers <- as.vector(result2$symbol)  #THIS RETURNS JUST THE TICKER FROM THE DATA TO A DATAFRAME.
+tickers # THIS JUST SHOWS YOU THAT YOU HAVE THE RIGHT SET OF TICKERS BEFORE WE USE IT TO THE FUNCTION CALL.
+
+
+#### OKAY THIS IS THE MAIN ENGINE.....WE ARE DEFINING A FUNCTION WHICH TAKES TICKERS, A COMPANY DATAFRAME, AND NUMBER OF YEARS
+#### IT RETURNS A DATAFRAME WITH EACH TICKER WITH 10 YEARS OF DIVIDENDS AND THE PRICE ON THE 31ST DAY OF DECEMBER OF THE YEAR IN QUESTION, OR YEAR END CLOSE.
 
 get_stock_data_wide <- function(tickers, company_df, years = 10) {
   from_date <- Sys.Date() - (365 * years)
@@ -107,10 +133,11 @@ get_stock_data_wide <- function(tickers, company_df, years = 10) {
   return(final)
 }
 
-#result3 <- get_stock_data(tickers)
-company_df <- mydf2 %>% select(company_name, Ticker = symbol)
+##### THE PREVIOUS STEP WAS JUST TO GET A FEEL THAT THE PROCESS WAS WORKING... THIS STEP ACTUALLY DOES THE FULL LIST... HAD TO WALK BEFORE RUNNING
+
+company_df <- mydf2 %>% select(company_name, Ticker = symbol) # FIRST GET THE COMPANY NAME AND TICKERS
 result3 <- get_stock_data_wide(tickers, company_df)
-head(result3, 20)
+head(result3, 20) #THIS IS THE RAW RESULT WITHOUT ANY CALCULATE FIELDS.
 
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 result4 <- result3 %>%
