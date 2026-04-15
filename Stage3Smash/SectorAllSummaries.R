@@ -32,20 +32,19 @@ download.file("https://cyrusjones159.github.io/Cockey-Investments/Media/MediaEnt
 #PART2 -> You need to open the file and save it as Excel97 File with a Different Name....as the Wickham plugin isnt so great(It requires old Excel Versions- SaveAs in Excel)....OR you can you wget instead of download.
 #PART2A-> I am going into the downloaded files and opening them in Excel and resaving them in 97 Version with a different file name... and wala they work again.... Maybe CSV is a better call but.. no Wickham...:)
 mydf <- read_excel("c:/users/stritzj/Documents/542/financials3.xls")
-mydf2 <- read_excel("c:/users/stritzj/Documents/542/autos3.xls")
-mydf3 <- read_excel("c:/users/stritzj/Documents/542/industrials3.xls")
-mydf4 <- read_excel("c:/users/stritzj/Documents/542/health3.xls")
-mydf5 <- read_excel("c:/users/stritzj/Documents/542/media3.xls")
+automydf <- read_excel("c:/users/stritzj/Documents/542/autos3.xls")
+indmydf <- read_excel("c:/users/stritzj/Documents/542/industrials3.xls")
+healthmydf <- read_excel("c:/users/stritzj/Documents/542/health3.xls")
+mediamydf <- read_excel("c:/users/stritzj/Documents/542/media3.xls")
 head(mydf, 5)
-head(mydf2, 5)
-head(mydf3, 5)
-head(mydf4, 5)
-head(mydf5, 5)
-str(mydf)
 
 ### THE DATA FRAME COMES BACK WITH UNCLEAN NAMES CLEAN NAMES IS PART OF THE JANITOR FUNCTION LIBRARY I LOADED EARLIER.
 mydf2 <- clean_names(mydf)
 head(mydf2, 5)
+automydf2 <-clean_names(automydf)
+indmydf2 <- clean_names(indmydf)
+healthmydf2 <- clean_names(healthmydf)
+mediamydf2 <- clean_names(mediamydf)
 #### MYDF2 SHOULD BE A DATAFRAME VERSION OF THE ORIGINAL STOCK SCREENER IT HAS LOTS OF EXTRANEOUS COLUMNS OBVIOUSLY AS WE ONLY NEED THE TICKERS....
 
 ##### THIS STEP IS JUST TO GET A FEEL FOR THE DATA SET TO GIVE YOU CONFIDENCE WE ARE NOT WILD AND CRAZY.
