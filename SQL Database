@@ -1,2 +1,33 @@
 Here is the code to create a local database using SQLite, unfortunatley it is not possible to create a remote database. 
 However, I am not 100% sure but it may be possible to put the database as a link on the site we can reference, TBD...
+
+# Code to make SQL database
+library(readxl) # to read the excel file into the workspace
+library(tidyverse)
+library(dbplyr)
+library(sqldf)
+library(mdsr)
+library(DBI)
+
+# laod in and save data to workspace
+data = "C:/Users/.../MediaEntertainmentScreener_results.xlsx"
+media <- read_xlsx(data)
+setwd("C:/.../Project")
+
+con <- dbConnect(RSQLite::SQLite(), "my_database.sqlite")
+
+dbWriteTable(con, "media", media, overwrite = TRUE)
+
+# testing if data base is good and can be queried from
+sqldf('SELECT Symbol
+      FROM media
+      WHERE "Security Type" = "Common Stock"')
+
+tickers <- as.list(
+  sqldf('SELECT Symbol FROM media WHERE "Security Type" == "Common Stock"')
+  )
+
+tickers_2 <- media %>%
+  filter(`Security Type`== 'Common Stock') %>%
+  select(Symbol)
+as.list(tickers_2)
