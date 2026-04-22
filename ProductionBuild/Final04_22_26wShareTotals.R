@@ -197,6 +197,9 @@ head(indresult3, 20) #THIS IS THE RAW RESULT WITHOUT ANY CALCULATE FIELDS
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 result4 <- result3 %>%
      mutate(
+    #0) AddSector
+    sector = "financials",
+       
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -232,6 +235,7 @@ result4 <- result3 %>%
 
     #13) Projected Total Yield5
     totalfiveyearview = fiveyearequityproj + fiveyeardivproj
+   
   )
   
 result4
@@ -240,6 +244,10 @@ write_xlsx(result4, "fullviewfinancials.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 autoresult4 <- autoresult3 %>%
   mutate(
+    
+    #0) AddSector
+    sector = "autos",
+    
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -282,6 +290,9 @@ write_xlsx(autoresult4, "fullviewautos.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 mediaresult4 <- mediaresult3 %>%
  mutate(
+    #0) AddSector
+    sector = "media",
+   
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -324,6 +335,10 @@ write_xlsx(mediaresult4, "fullviewmedia.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 healthresult4 <- healthresult3 %>%
   mutate(
+    
+     #0) AddSector
+    sector = "health",
+    
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -366,6 +381,10 @@ write_xlsx(healthresult4, "fullviewhealth.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 indresult4 <- indresult3 %>%
   mutate(
+
+    #0) AddSector
+    sector = "health",
+    
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -404,6 +423,18 @@ indresult4 <- indresult3 %>%
   )
 indresult4
 write_xlsx(indresult4, "fullviewindustrials.result.xlsx")
+
+
+#BUILD SUPERDATAFRAME OF ALL STOCKS INTO ONE... AND WRITE IT TO DISK
+superdf <- bind_rows(
+  result4,
+  autoresult4,
+  mediaresult4,
+  healthresult4,
+  indresult4
+)
+superdf
+write_xlsx(superdf, "submission.stats542.xlsx")
 
 
 
