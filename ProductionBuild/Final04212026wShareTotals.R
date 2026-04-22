@@ -24,6 +24,7 @@ library(sqldf)
 library(janitor)
 
 # SECTION1 - DOWNLOAD THE FIDELITY EXTRACTS WHICH WERE MANUALLY CONVERTED TO EXCEL97 FORMAT AND PUT THEM IN THE WORKING DIRECTORY
+# SECTION1B - FIDELITY EXTRACTS WERE BUILT in XLS BUT IN NEW FORM, AND WERE MANUALLY CONVERTED BY JSS FOR THE STEPS BELOW.
 
 #PART1-> WE USED FIDELITY INVESTMENTS STOCK SCREENER TO PARE DOWN TARGET INVESTMENTS (SEE SCREENSHOTS FOR DETAILS)
 #PART2 -> PROCESS AND DOWNLOAD ALL FILES LOCALLY (SOURCE PATH-> DESTINATION PATH)
@@ -32,9 +33,6 @@ download.file("https://cyrusjones159.github.io/Cockey-Investments/Automotive/aut
 download.file("https://cyrusjones159.github.io/Cockey-Investments/Automotive/industrials3.xls", ".\\industrials3.xls", mode = "wb")
 download.file("https://cyrusjones159.github.io/Cockey-Investments/Healthcare/health3.xls", ".\\health3.xls", mode = "wb")
 download.file("https://cyrusjones159.github.io/Cockey-Investments/Media/media3.xls", ".\\media3.xls", mode = "wb")
-
-#PART3 -> You need to open the file and save it as Excel97 File with a Different Name....as the Wickham plugin isnt so great(It requires old Excel Versions- SaveAs in Excel)....OR you can you wget instead of download.
-#PART3A-> I am going into the downloaded files and opening them in Excel and resaving them in 97 Version with a different file name... and wala they work again.... Maybe CSV is a better call but.. no Wickham...:)
 
 
 #SECTION2A - LOAD THE EXCEL FILES USING THE WICKHAM(OUR TEXTBOOKS AUTHORS PLUGIN) INTO DATAFAMES SO THEY CAN BE MANIPULATED - AND USE THE JANITOR PLUGIN TO CLEAN WEIRD SYMBOLS FROM THE COLUMNS
@@ -192,6 +190,7 @@ head(mediaresult3, 20) #THIS IS THE RAW RESULT WITHOUT ANY CALCULATE FIELDS
 indcompany_df <- indmydf2 %>% select(company_name, Ticker = symbol) # FIRST GET THE COMPANY NAME AND TICKERS
 indresult3 <- get_stock_data_wide(tickers, indcompany_df)
 head(indresult3, 20) #THIS IS THE RAW RESULT WITHOUT ANY CALCULATE FIELDS
+#THESE TAKE A BIT TO RUN
 
 #SECTION 8 -> MUTATE THE RESULTS TO INCLUDE CALCULATED INVESTMENT YIELDS
 
@@ -367,7 +366,6 @@ write_xlsx(healthresult4, "fullviewhealth.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 indresult4 <- indresult3 %>%
   mutate(
-   mutate(
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
