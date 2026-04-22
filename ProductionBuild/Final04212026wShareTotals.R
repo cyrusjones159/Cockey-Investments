@@ -223,7 +223,16 @@ result4 <- result3 %>%
     shares500 = ceiling(500 / price_end),
     
     # 9) Total spend = rounded shares × current market price
-    totalspend = shares500 * price_end
+    totalspend = shares500 * price_end,
+
+    #11) Projected Equity Return5
+    fiveyearequityproj = totalreturnover10 * 5,
+
+    #12) Projected Dividend Yield5
+    fiveyeardivproj = avgdividend * 5,
+
+    #13) Projected Total Yield5
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
   )
   
 result4
@@ -257,7 +266,16 @@ autoresult4 <- autoresult3 %>%
     shares500 = ceiling(500 / price_end),
     
     # 9) Total spend = rounded shares × current market price
-    totalspend = shares500 * price_end
+    totalspend = shares500 * price_end,
+
+    #10) Projected Equity Return5
+    fiveyearequityproj = totalreturnover10 * 5,
+
+    #11) Projected Dividend Yield5
+    fiveyeardivproj = avgdividend * 5,
+
+    #12) Projected Total Yield5
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
   )
 autoresult4
 write_xlsx(autoresult4, "fullviewautos.result.xlsx")
@@ -290,7 +308,16 @@ mediaresult4 <- mediaresult3 %>%
     shares500 = ceiling(500 / price_end),
     
     # 9) Total spend = rounded shares × current market price
-    totalspend = shares500 * price_end
+    totalspend = shares500 * price_end,
+
+    #10) Projected Equity Return5
+    fiveyearequityproj = totalreturnover10 * 5,
+
+    #11) Projected Dividend Yield5
+    fiveyeardivproj = avgdividend * 5,
+
+    #12) Projected Total Yield5
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
   )
 mediaresult4
 write_xlsx(mediaresult4, "fullviewmedia.result.xlsx")
@@ -323,7 +350,16 @@ healthresult4 <- healthresult3 %>%
     shares500 = ceiling(500 / price_end),
     
     # 9) Total spend = rounded shares × current market price
-    totalspend = shares500 * price_end
+    totalspend = shares500 * price_end,
+
+    #10) Projected Equity Return5
+    fiveyearequityproj = totalreturnover10 * 5,
+
+    #11) Projected Dividend Yield5
+    fiveyeardivproj = avgdividend * 5,
+
+    #12) Projected Total Yield5
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
   )
 healthresult4
 write_xlsx(healthresult4, "fullviewhealth.result.xlsx")
@@ -357,7 +393,16 @@ indresult4 <- indresult3 %>%
     shares500 = ceiling(500 / price_end),
     
     # 9) Total spend = rounded shares × current market price
-    totalspend = shares500 * price_end
+    totalspend = shares500 * price_end,
+
+    #10) Projected Equity Return5
+    fiveyearequityproj = totalreturnover10 * 5,
+
+    #11) Projected Dividend Yield5
+    fiveyeardivproj = avgdividend * 5,
+
+    #12) Projected Total Yield5
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
   )
 indresult4
 write_xlsx(indresult4, "fullviewindustrials.result.xlsx")
