@@ -1,0 +1,15 @@
+This folder contains all data frames and code used to generate relavent plots
+
+The data analysis builds off the stage two filtering files and a modified version of the get_stock_data_wide() function defined in the SectorAllSummeriesV3Date0414 file in the Stage3Smash folder
+    
+    The modified function returns a nested data frame that contains both the wide and long formats of the collected data. I choose to moify the code to make the building of the graphics easier
+    and more intuitive for readers
+
+    The modified code includes comments explaining teh modifications and choices made
+
+
+We are plotting year end stock price  and total annual dividend payments over the ten year period from 2016-2016 
+    In all of the graphics the x-variable is the year 
+    For the price plot the y-variable is the price on dec 31 of the corresponding year
+    For the dividend plots the y-variable is the total annual dividends payed (in USD) from Jan 1 - Dec 31
+
