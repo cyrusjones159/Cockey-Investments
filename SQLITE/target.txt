@@ -1,0 +1,2 @@
+sqlite3 for windows to go here.
+sqlite3 for linux needs to be added on command line. apt get sqlite3....etc
