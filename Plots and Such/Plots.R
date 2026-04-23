@@ -7,7 +7,7 @@ library(quantmod)
 
 #PART3 -> You need to open the file and save it as Excel97 File with a Different Name....as the Wickham plugin isnt so great(It requires old Excel Versions- SaveAs in Excel)....OR you can you wget instead of download.
 #PART3A-> I am going into the downloaded files and opening them in Excel and resaving them in 97 Version with a different file name... and wala they work again.... Maybe CSV is a better call but.. no Wickham...:)
-setwd("C:/Users/ruffh/OneDrive/USC/Spring 26/STAT 542/Project")
+setwd("C:/...") # set directory to where files are located
 financials <- read_excel("financials2.xlsx")
 automotives <- read_excel("autos2.xlsx")
 industrials <- read_excel("industrials2.xlsx")
@@ -15,11 +15,10 @@ healthcares <- read_excel("health2.xlsx")
 medias <- read_excel("media2.xlsx")
 
 financials <- clean_names(financials)
-automotives <- clean_names(automotives)
+automotives<- clean_names(automotives)
 industrials <- clean_names(industrials)
 healthcares <- clean_names(healthcares)
 medias <- clean_names(medias)
-
 
 ## ---- pick the top x number of stocks with the highest dividend yield ---- ##
 select_top_x <- function(data, x = 20){
@@ -121,7 +120,7 @@ get_stock_data_wide <- function(tickers, company_df, years = 10) {
     group_by(Ticker, Year) %>%
     summarize(Dividend = sum(Dividend), .groups = "drop")
   
-  # Return as a list so you can use both formats
+  # Return a list so you can plot both
   return(list(
     wide = final,
     price_long = price_long,
@@ -144,20 +143,16 @@ healthcares_final <- get_stock_data_wide(health_tick, health_df)
 media_df <- medias %>% select(company_name, Ticker = symbol)
 medias_final <- get_stock_data_wide(media_tick, media_df)
 
-## --- price and dividend plots over time --- ##
-sectors <- list(financials_final, industrials_final, automotives_final, healthcares_final, medias_final)
+sectors <- list(financials_final, automotives_final, industrials_final, healthcares_final, medias_final)
 
 price_plots <- list()
 div_plots <- list()
 
-# create a for loop that runs for each df in sectors
 for (i in seq_along(sectors)){
   
-  # gather prices and dividends
   sector_prices <- sectors[[i]]$price_long
   sector_divs <- sectors[[i]]$div_long
   
-  # plot the prices using color to distingush companies
   plot_prices <- ggplot(sector_prices, aes(x = Year, y = Price, color = Ticker)) + 
     geom_line(size=1.1) + 
     geom_point() + 
@@ -165,7 +160,6 @@ for (i in seq_along(sectors)){
          y = 'Price on Dec 31 ($)') + 
     theme_minimal()
   
-  # plot the dividends using color to distinguish companies
   plot_divs <- ggplot(sector_divs, aes(x = Year, y = Dividend, color = Ticker)) +
     geom_line(size = 1.1) +
     geom_point() +
@@ -173,25 +167,21 @@ for (i in seq_along(sectors)){
          y = "Total Dividends ($)") + 
     theme_minimal()
   
-  # store the plots in the storage lists
   price_plots[[i]] <- plot_prices
   div_plots[[i]] <- plot_divs
   
-  # print the two plots for the sector currently iteratinng 
   print(plot_prices)
   print(plot_divs)
 }
 
+## --- get average to make industry plots --- ##
 
-## --- get averages to make industry plots --- ##
+financials_final$price_long$sector <- "financial"
+industrials_final$price_long$sector <- "industrial"
+automotives_final$price_long$sector <- "auto"
+healthcares_final$price_long$sector <- "health"
+medias_final$price_long$sector <- "media"
 
-# rename sector variable in the price_ long tables for each industry
-financials_final$price_long$sector <- "Financial"
-industrials_final$price_long$sector <- "Industrial"
-automotives_final$price_long$sector <- "Automotive"
-healthcares_final$price_long$sector <- "Healthcare"
-medias_final$price_long$sector <- "Entertainment"
-# combine all industry price data into one table to call upon
 all_prices <- bind_rows(
   financials_final$price_long,
   industrials_final$price_long,
@@ -200,12 +190,12 @@ all_prices <- bind_rows(
   medias_final$price_long
   )
 
-# repeat the above process for dividends
 financials_final$div_long$sector <- "financial"
 industrials_final$div_long$sector <- "industrial"
 automotives_final$div_long$sector <- "auto"
 healthcares_final$div_long$sector <- "health"
 medias_final$div_long$sector <- "media"
+
 all_divs <- bind_rows(
   financials_final$div_long,
   industrials_final$div_long,
@@ -214,26 +204,14 @@ all_divs <- bind_rows(
   medias_final$div_long
   )
 
-# create a data frame containing average yearly prices across all sectors
 avg_prices_yearly <- all_prices %>%
   group_by(sector, Year) %>%
   summarize(avg_price = mean(Price, na.rm = TRUE), .groups = "drop")
 
-# create a data frame containing average yearly dividends across all sectors
 avg_divs_yearly <- all_divs %>%
   group_by(sector, Year) %>%
   summarize(avg_div = mean(Dividend, na.rm = TRUE), .groups = "drop")
 
-# create a normalized prices to plot percent change to gauge performance rather than value
-norm_prices <- all_prices %>%
-  group_by(Ticker) %>%
-  mutate(norm_price = Price / first(Price)) %>%
-  ungroup()
-avg_norm_prices <- norm_prices %>%
-  group_by(sector, Year) %>%
-  summarize(avg_norm = mean(norm_price, na.rm = TRUE), .groups = "drop")
-
-# create a plot for average year end prices by sector
 ggplot(avg_prices_yearly, aes(x = Year, y = avg_price, color = sector)) +
   geom_line(size = 1.3) +
   geom_point(size = 2) +
@@ -248,8 +226,20 @@ ggplot(avg_prices_yearly, aes(x = Year, y = avg_price, color = sector)) +
     plot.title = element_text(face = "bold"),
     legend.position = "bottom"
   )
+theme(
+  plot.title = element_text(face = "bold"),
+  legend.position = "bottom"
+)
 
-# creatre a plot for average normalized year end prices by sector
+normalized_prices <- all_prices %>%
+  group_by(Ticker) %>%
+  mutate(norm_price = Price / first(Price)) %>%
+  ungroup()
+
+avg_norm_prices <- normalized_prices %>%
+  group_by(sector, Year) %>%
+  summarize(avg_norm = mean(norm_price, na.rm = TRUE), .groups = "drop")
+
 ggplot(avg_norm_prices, aes(x = Year, y = avg_norm, color = sector)) +
   geom_line(size = 1.3) +
   labs(
@@ -258,11 +248,10 @@ ggplot(avg_norm_prices, aes(x = Year, y = avg_norm, color = sector)) +
   ) +
   theme_minimal(base_size = 14) + 
   theme(
-    lot.title = element_text(face = "bold"),
+    plot.title = element_text(face = "bold"),
     legend.position = "bottom"
   )
 
-# create a plot for average dividends per year by sector 
 ggplot(avg_divs_yearly, aes(x = Year, y = avg_div, color = sector)) +
   geom_line(size = 1.3) +
   geom_point(size = 2) +
