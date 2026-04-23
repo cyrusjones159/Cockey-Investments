@@ -645,8 +645,7 @@ print(reitsresult5)
 # WRITE THE RESULTS BACK TO DISK
 write_xlsx(indresult5, "industrials.result.xlsx")
 
-# SECTION12 - GGPLOT FUNCTION AND RESULTS
-
+# SECTION 12 - GGPLOT FUNCTION AND RESULTS
 
 library(dplyr)
 library(tidyr)
@@ -815,6 +814,7 @@ plot_sector_summary <- function(df, sector_name, original_df) {
 # 5. Build summaries for all sectors
 # ============================================================
 
+fin_summary    <- sector_summary(result4)
 auto_summary   <- sector_summary(autoresult4)
 health_summary <- sector_summary(healthresult4)
 media_summary  <- sector_summary(mediaresult4)
@@ -824,6 +824,10 @@ reits_summary  <- sector_summary(reitsresult4)
 # ============================================================
 # 6. Build stock-level plots
 # ============================================================
+
+p_fin_prices   <- plot_stock_prices(convert_prices_long(result4), "Financials")
+p_fin_divs     <- plot_stock_dividends(convert_dividends_long(result4), "Financials")
+p_fin_equity   <- plot_stock_equity(convert_equity_long(result4), "Financials")
 
 p_auto_prices   <- plot_stock_prices(convert_prices_long(autoresult4), "Automotive")
 p_auto_divs     <- plot_stock_dividends(convert_dividends_long(autoresult4), "Automotive")
@@ -849,6 +853,7 @@ p_reits_equity  <- plot_stock_equity(convert_equity_long(reitsresult4), "REITs")
 # 7. Build sector-level plots
 # ============================================================
 
+p_fin_summary    <- plot_sector_summary(fin_summary, "Financials", result4)
 p_auto_summary   <- plot_sector_summary(auto_summary, "Automotive", autoresult4)
 p_health_summary <- plot_sector_summary(health_summary, "Healthcare", healthresult4)
 p_media_summary  <- plot_sector_summary(media_summary, "Media", mediaresult4)
@@ -862,17 +867,62 @@ p_reits_summary  <- plot_sector_summary(reits_summary, "REITs", reitsresult4)
 pdf("all_sector_plots.pdf", width = 12, height = 8)
 
 # Stock-level plots
-print(p_auto_prices);   print(p_auto_divs);   print(p_auto_equity)
+print(p_fin_prices);   print(p_fin_divs);   print(p_fin_equity)
+print(p_auto_prices);  print(p_auto_divs);  print(p_auto_equity)
 print(p_health_prices); print(p_health_divs); print(p_health_equity)
-print(p_media_prices);  print(p_media_divs);  print(p_media_equity)
-print(p_ind_prices);    print(p_ind_divs);    print(p_ind_equity)
-print(p_reits_prices);  print(p_reits_divs);  print(p_reits_equity)
+print(p_media_prices); print(p_media_divs); print(p_media_equity)
+print(p_ind_prices);   print(p_ind_divs);   print(p_ind_equity)
+print(p_reits_prices); print(p_reits_divs); print(p_reits_equity)
 
 # Sector-level summaries
+print(p_fin_summary)
 print(p_auto_summary)
 print(p_health_summary)
 print(p_media_summary)
 print(p_ind_summary)
 print(p_reits_summary)
 
+dev.off()
+
+
+
+# ============================================================
+# FACET GRID OF FITTED LINES (6 SMALL BOXES)
+# ============================================================
+
+# 1. Combine all sector summaries into one long-format dataset
+all_sectors_long <- bind_rows(
+  fin_summary    %>% mutate(Sector = "Financials"),
+  auto_summary   %>% mutate(Sector = "Automotive"),
+  health_summary %>% mutate(Sector = "Healthcare"),
+  media_summary  %>% mutate(Sector = "Media"),
+  ind_summary    %>% mutate(Sector = "Industrials"),
+  reits_summary  %>% mutate(Sector = "REITs")
+) %>%
+  pivot_longer(
+    cols = c(AvgDividend, AvgEquityChange),
+    names_to = "Metric",
+    values_to = "Value"
+  )
+
+# 2. Build the 6‑box facet plot (2×3 layout)
+p_facet_small <- ggplot(all_sectors_long, aes(x = Year, y = Value, color = Metric)) +
+  geom_smooth(method = "lm", se = FALSE, size = 1.4) +
+  facet_wrap(~ Sector, ncol = 3, scales = "free_y") +
+  labs(
+    title = "Fitted Trend Lines for Dividends and Stock Yields by Sector",
+    x = "Year",
+    y = "Fitted Value",
+    color = "Metric"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 20),
+    strip.text = element_text(size = 14, face = "bold")
+  )
+
+# 3. Export to a separate PDF
+pdf("sector_fitted_trends_small_boxes.pdf", width = 14, height = 10)
+print(p_facet_small)
 dev.off()
