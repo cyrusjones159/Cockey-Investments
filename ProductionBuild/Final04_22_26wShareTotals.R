@@ -10,6 +10,8 @@ install.packages("purrr")
 install.packages("lubridate")
 install.packages("tidyr")
 install.packages("writexl")
+install.packages("DBI")
+install.packages("RSQLite")
 library(writexl)
 library(lubridate)
 library(tidyr)
@@ -22,6 +24,9 @@ library(wget) #THIS REQUIRES WGET ON YOU MAC OR WINDOWS BEING INSTALLED... OTHER
 library(dplyr)
 library(sqldf)
 library(janitor)
+library(DBI)
+library(RSQLite)
+
 
 # SECTION1 - DOWNLOAD THE FIDELITY EXTRACTS WHICH WERE MANUALLY CONVERTED TO EXCEL97 FORMAT AND PUT THEM IN THE WORKING DIRECTORY
 # SECTION1B - FIDELITY EXTRACTS WERE BUILT in XLS BUT IN NEW FORM, AND WERE MANUALLY CONVERTED BY JSS FOR THE STEPS BELOW.
@@ -424,6 +429,7 @@ indresult4 <- indresult3 %>%
 indresult4
 write_xlsx(indresult4, "fullviewindustrials.result.xlsx")
 
+#SECTION 9 - SUMMARIZE RESULTS IN A SINGLE DATAFRAME AND WRITE TO EXCEL
 
 #BUILD SUPERDATAFRAME OF ALL STOCKS INTO ONE... AND WRITE IT TO DISK
 superdf <- bind_rows(
@@ -436,6 +442,19 @@ superdf <- bind_rows(
 superdf
 write_xlsx(superdf, "submission.stats542.xlsx")
 
+
+#SECTION 10 - SUMMARIZE RESULTS IN A DATABASE FOR SQLITE
+
+# Connect (creates DB file if it doesn't exist)
+con <- dbConnect(SQLite(), "submission.stats542.sqlite")
+# Write the combined dataframe
+dbWriteTable(con, "allstocks", superdf, overwrite = TRUE)
+
+# Close connection
+dbDisconnect(con)
+
+
+#SECTION 11 - IF YOU SO DESIRE SUMMARIZE RESULTS
 
 
 # FINAL SELECT HAS JUST SOME OF THE FIELDS AS YOU MAY WANT TO RESTRICT TO ANY YEAR A NEGATIVE EQUITY WAS PRESENT
