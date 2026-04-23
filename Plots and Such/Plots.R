@@ -7,7 +7,7 @@ library(quantmod)
 
 #PART3 -> You need to open the file and save it as Excel97 File with a Different Name....as the Wickham plugin isnt so great(It requires old Excel Versions- SaveAs in Excel)....OR you can you wget instead of download.
 #PART3A-> I am going into the downloaded files and opening them in Excel and resaving them in 97 Version with a different file name... and wala they work again.... Maybe CSV is a better call but.. no Wickham...:)
-setwd("C:/Users/ruffh/OneDrive/USC/Spring 26/STAT 542/Project")
+setwd("C:/....") # set wd to acces files easier
 financials <- read_excel("financials2.xlsx")
 automotives <- read_excel("autos2.xlsx")
 industrials <- read_excel("industrials2.xlsx")
