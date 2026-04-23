@@ -10,6 +10,8 @@ install.packages("purrr")
 install.packages("lubridate")
 install.packages("tidyr")
 install.packages("writexl")
+install.packages("DBI")
+install.packages("RSQLite")
 library(writexl)
 library(lubridate)
 library(tidyr)
@@ -22,8 +24,12 @@ library(wget) #THIS REQUIRES WGET ON YOU MAC OR WINDOWS BEING INSTALLED... OTHER
 library(dplyr)
 library(sqldf)
 library(janitor)
+library(DBI)
+library(RSQLite)
+
 
 # SECTION1 - DOWNLOAD THE FIDELITY EXTRACTS WHICH WERE MANUALLY CONVERTED TO EXCEL97 FORMAT AND PUT THEM IN THE WORKING DIRECTORY
+# SECTION1B - FIDELITY EXTRACTS WERE BUILT in XLS BUT IN NEW FORM, AND WERE MANUALLY CONVERTED BY JSS FOR THE STEPS BELOW.
 
 #PART1-> WE USED FIDELITY INVESTMENTS STOCK SCREENER TO PARE DOWN TARGET INVESTMENTS (SEE SCREENSHOTS FOR DETAILS)
 #PART2 -> PROCESS AND DOWNLOAD ALL FILES LOCALLY (SOURCE PATH-> DESTINATION PATH)
@@ -32,9 +38,6 @@ download.file("https://cyrusjones159.github.io/Cockey-Investments/Automotive/aut
 download.file("https://cyrusjones159.github.io/Cockey-Investments/Automotive/industrials3.xls", ".\\industrials3.xls", mode = "wb")
 download.file("https://cyrusjones159.github.io/Cockey-Investments/Healthcare/health3.xls", ".\\health3.xls", mode = "wb")
 download.file("https://cyrusjones159.github.io/Cockey-Investments/Media/media3.xls", ".\\media3.xls", mode = "wb")
-
-#PART3 -> You need to open the file and save it as Excel97 File with a Different Name....as the Wickham plugin isnt so great(It requires old Excel Versions- SaveAs in Excel)....OR you can you wget instead of download.
-#PART3A-> I am going into the downloaded files and opening them in Excel and resaving them in 97 Version with a different file name... and wala they work again.... Maybe CSV is a better call but.. no Wickham...:)
 
 
 #SECTION2A - LOAD THE EXCEL FILES USING THE WICKHAM(OUR TEXTBOOKS AUTHORS PLUGIN) INTO DATAFAMES SO THEY CAN BE MANIPULATED - AND USE THE JANITOR PLUGIN TO CLEAN WEIRD SYMBOLS FROM THE COLUMNS
@@ -192,12 +195,16 @@ head(mediaresult3, 20) #THIS IS THE RAW RESULT WITHOUT ANY CALCULATE FIELDS
 indcompany_df <- indmydf2 %>% select(company_name, Ticker = symbol) # FIRST GET THE COMPANY NAME AND TICKERS
 indresult3 <- get_stock_data_wide(tickers, indcompany_df)
 head(indresult3, 20) #THIS IS THE RAW RESULT WITHOUT ANY CALCULATE FIELDS
+#THESE TAKE A BIT TO RUN
 
 #SECTION 8 -> MUTATE THE RESULTS TO INCLUDE CALCULATED INVESTMENT YIELDS
 
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 result4 <- result3 %>%
      mutate(
+    #0) AddSector
+    sector = "financials",
+       
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -225,14 +232,18 @@ result4 <- result3 %>%
     # 9) Total spend = rounded shares × current market price
     totalspend = shares500 * price_end,
 
-    #11) Projected Equity Return5
+    #10) Projected Equity Return5
     fiveyearequityproj = totalreturnover10 * 5,
 
-    #12) Projected Dividend Yield5
+    #11) Projected Dividend Yield5
     fiveyeardivproj = avgdividend * 5,
 
-    #13) Projected Total Yield5
-    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
+    #12) Projected Total Yield5
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj,
+    
+    #13) Selected By Team - Should be Yes Or No
+    selected = "TBD"
+   
   )
   
 result4
@@ -241,6 +252,10 @@ write_xlsx(result4, "fullviewfinancials.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 autoresult4 <- autoresult3 %>%
   mutate(
+    
+    #0) AddSector
+    sector = "autos",
+    
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -275,7 +290,10 @@ autoresult4 <- autoresult3 %>%
     fiveyeardivproj = avgdividend * 5,
 
     #12) Projected Total Yield5
-    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj,
+    
+    #13) Selected By Team - Should be Yes Or No
+    selected = "TBD"
   )
 autoresult4
 write_xlsx(autoresult4, "fullviewautos.result.xlsx")
@@ -283,6 +301,9 @@ write_xlsx(autoresult4, "fullviewautos.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 mediaresult4 <- mediaresult3 %>%
  mutate(
+    #0) AddSector
+    sector = "media",
+   
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -317,7 +338,10 @@ mediaresult4 <- mediaresult3 %>%
     fiveyeardivproj = avgdividend * 5,
 
     #12) Projected Total Yield5
-    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj,
+    
+    #13) Selected By Team - Should be Yes Or No
+    selected = "TBD"
   )
 mediaresult4
 write_xlsx(mediaresult4, "fullviewmedia.result.xlsx")
@@ -325,6 +349,10 @@ write_xlsx(mediaresult4, "fullviewmedia.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 healthresult4 <- healthresult3 %>%
   mutate(
+    
+     #0) AddSector
+    sector = "health",
+    
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -359,7 +387,10 @@ healthresult4 <- healthresult3 %>%
     fiveyeardivproj = avgdividend * 5,
 
     #12) Projected Total Yield5
-    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj,
+    
+    #13) Selected By Team - Should be Yes Or No
+    selected = "TBD"
   )
 healthresult4
 write_xlsx(healthresult4, "fullviewhealth.result.xlsx")
@@ -367,7 +398,10 @@ write_xlsx(healthresult4, "fullviewhealth.result.xlsx")
 # MUTATE THREE TO CALCULATE THE AVG DIVIDEND OVER 10 YEARS, THE STARTING PRICE, THE ENDING PRICE IN YEAR 10, AND EQUITY CHANGES.
 indresult4 <- indresult3 %>%
   mutate(
-   mutate(
+
+    #0) AddSector
+    sector = "health",
+    
     # 1) Average dividend across all Div_* columns
     avgdividend = rowMeans(select(., starts_with("Div_")), na.rm = TRUE),
     
@@ -402,11 +436,40 @@ indresult4 <- indresult3 %>%
     fiveyeardivproj = avgdividend * 5,
 
     #12) Projected Total Yield5
-    totalfiveyearview = fiveyearequityproj + fiveyeardivproj
+    totalfiveyearview = fiveyearequityproj + fiveyeardivproj,
+    
+    #13) Selected By Team - Should be Yes Or No
+    selected = "TBD"
   )
 indresult4
 write_xlsx(indresult4, "fullviewindustrials.result.xlsx")
 
+#SECTION 9 - SUMMARIZE RESULTS IN A SINGLE DATAFRAME AND WRITE TO EXCEL
+
+#BUILD SUPERDATAFRAME OF ALL STOCKS INTO ONE... AND WRITE IT TO DISK
+superdf <- bind_rows(
+  result4,
+  autoresult4,
+  mediaresult4,
+  healthresult4,
+  indresult4
+)
+superdf
+write_xlsx(superdf, "submission.stats542.xlsx")
+
+
+#SECTION 10 - SUMMARIZE RESULTS IN A DATABASE FOR SQLITE
+
+# Connect (creates DB file if it doesn't exist)
+con <- dbConnect(SQLite(), "submission.stats542.sqlite")
+# Write the combined dataframe
+dbWriteTable(con, "allstocks", superdf, overwrite = TRUE)
+
+# Close connection
+dbDisconnect(con)
+
+
+#SECTION 11 - IF YOU SO DESIRE SUMMARIZE RESULTS
 
 
 # FINAL SELECT HAS JUST SOME OF THE FIELDS AS YOU MAY WANT TO RESTRICT TO ANY YEAR A NEGATIVE EQUITY WAS PRESENT

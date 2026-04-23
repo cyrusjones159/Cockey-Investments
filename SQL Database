@@ -31,3 +31,33 @@ tickers_2 <- media %>%
   filter(`Security Type`== 'Common Stock') %>%
   select(Symbol)
 as.list(tickers_2)
+
+
+#***********************************
+#HOLDEN COMMENTS BELOW.
+
+SQLDF RUNS ON DATAFRAMES AND NOT SQLITE-> LIBRARY DBI CREATES A MYSQL DATABASE.
+
+#SECTION 9 - SUMMARIZE RESULTS IN A SINGLE DATAFRAME AND WRITE TO EXCEL
+
+#BUILD SUPERDATAFRAME OF ALL STOCKS INTO ONE... AND WRITE IT TO DISK
+superdf <- bind_rows(
+  result4,
+  autoresult4,
+  mediaresult4,
+  healthresult4,
+  indresult4
+)
+superdf
+write_xlsx(superdf, "submission.stats542.xlsx")
+
+
+SECTION 10
+
+# Connect (creates DB file if it doesn't exist)
+con <- dbConnect(SQLite(), "submission.stats542.sqlite")
+# Write the combined dataframe
+dbWriteTable(con, "allstocks", superdf, overwrite = TRUE)
+
+# Close connection
+dbDisconnect(con)
