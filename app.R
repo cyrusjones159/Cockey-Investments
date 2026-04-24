@@ -77,8 +77,8 @@ sector_documents <- list(
       paste0(github_base, "/Automotive/ConsumerDiscretionaryAutoscreener_results.xlsx"),
     "Automotive Industrials" =
       paste0(github_base, "/Automotive/IndustrialsScreener_results.xlsx"),
-      "Final Automotive Screener" = 
-      paste0(github_base, "/ProductionBuild/fullviewautos.result.xlsx")
+    "Final Automotive Screener" = 
+      paste0(github_base, "/ProductionPartner/fullviewautos.result.xlsx")
   ),
   Financials = c(
     "Stage1 Financials Screener" =
@@ -88,7 +88,7 @@ sector_documents <- list(
     "Financial Screener" =
       paste0(github_base, "/Financials/FinancialsScreener_results.xlsx"),
     "Final Financials Screener" =
-      paste0(github_base, "/ProductionBuild/fullviewfinancials.result.xlsx")
+      paste0(github_base, "/ProductionPartner/fullviewfinancials.result.xlsx")
   ),
   Healthcare = c(
     "Stage1 Healthcare Screener" =
@@ -96,7 +96,7 @@ sector_documents <- list(
     "Healthcare Screener" =
       paste0(github_base, "/Healthcare/HCscreener_results.xlsx"),
     "Final Healthcare Screener" =
-      paste0(github_base, "/ProductionBuild/fullviewhealth.result.xlsx")
+      paste0(github_base, "/ProductionPartner/fullviewhealth.result.xlsx")
   ),
   Media = c(
     "Stage1 Media Entertainment" =
@@ -106,7 +106,7 @@ sector_documents <- list(
     "Second Media Screener" =
       paste0(github_base, "/Media/screener_results.xlsx"),
     "Final Media Screener" =
-      paste0(github_base, "/ProductionBuild/fullviewmedia.result.xlsx")
+      paste0(github_base, "/ProductionPartner/fullviewmedia.result.xlsx")
   )
 )
 
@@ -171,7 +171,7 @@ select_top_x <- function(data, x = 20) {
   if (!"dividend_yield" %in% names(data)) {
     return(dplyr::slice_head(data, n = min(x, nrow(data))))
   }
-
+  
   data |>
     arrange(desc(dividend_yield)) |>
     slice_head(n = x)
@@ -179,32 +179,32 @@ select_top_x <- function(data, x = 20) {
 
 get_stock_data_wide <- function(tickers, company_df, years = 10) {
   from_date <- Sys.Date() - (365 * years)
-
+  
   price_list <- list()
   dividend_list <- list()
-
+  
   for (t in tickers) {
     fetched <- tryCatch({
       suppressWarnings(getSymbols(t, from = from_date, auto.assign = FALSE))
     }, error = function(e) NULL)
-
+    
     if (is.null(fetched)) {
       next
     }
-
+    
     prices_df <- data.frame(
       Date = as.Date(time(fetched)),
       Close = as.numeric(Cl(fetched)),
       Ticker = t
     )
-
+    
     price_list[[t]] <- prices_df
-
+    
     divs <- tryCatch(
       getDividends(t, from = from_date),
       error = function(e) NULL
     )
-
+    
     if (!is.null(divs) && length(divs) > 0) {
       divs_df <- data.frame(
         Date = as.Date(time(divs)),
@@ -214,7 +214,7 @@ get_stock_data_wide <- function(tickers, company_df, years = 10) {
       dividend_list[[t]] <- divs_df
     }
   }
-
+  
   if (length(price_list) == 0) {
     return(list(
       wide = tibble(),
@@ -222,10 +222,10 @@ get_stock_data_wide <- function(tickers, company_df, years = 10) {
       div_long = tibble()
     ))
   }
-
+  
   prices_all <- bind_rows(price_list)
   dividends_all <- if (length(dividend_list) > 0) bind_rows(dividend_list) else tibble()
-
+  
   prices_yearly <- prices_all |>
     mutate(Year = year(Date)) |>
     group_by(Ticker, Year) |>
@@ -238,7 +238,7 @@ get_stock_data_wide <- function(tickers, company_df, years = 10) {
       values_from = Price_12_31,
       names_prefix = "Price_"
     )
-
+  
   dividends_yearly <- if (nrow(dividends_all) > 0) {
     dividends_all |>
       mutate(Year = year(Date)) |>
@@ -255,17 +255,17 @@ get_stock_data_wide <- function(tickers, company_df, years = 10) {
   } else {
     tibble(Ticker = unique(prices_all$Ticker))
   }
-
+  
   final <- prices_yearly |>
     left_join(dividends_yearly, by = "Ticker") |>
     left_join(company_df, by = "Ticker") |>
     select(Company = company_name, Ticker, everything())
-
+  
   price_long <- prices_all |>
     mutate(Year = year(Date)) |>
     group_by(Ticker, Year) |>
     summarize(Price = Close[which.max(Date)], .groups = "drop")
-
+  
   div_long <- if (nrow(dividends_all) > 0) {
     dividends_all |>
       mutate(Year = year(Date)) |>
@@ -274,7 +274,7 @@ get_stock_data_wide <- function(tickers, company_df, years = 10) {
   } else {
     tibble(Ticker = character(), Year = integer(), Dividend = numeric())
   }
-
+  
   list(
     wide = final,
     price_long = price_long,
@@ -389,7 +389,7 @@ ui <- page_sidebar(
 # --- Server ------------------------------------------------------------------
 
 server <- function(input, output, session) {
-
+  
   sector_plot_sources <- list(
     Financials = c(
       sector_documents$Financials[["Financial Screener"]]
@@ -405,11 +405,11 @@ server <- function(input, output, session) {
       sector_documents$Media[["Media Entertainment Screener"]]
     )
   )
-
+  
   stock_plot_data <- reactive({
     sector_results <- lapply(names(sector_plot_sources), function(sector_name) {
       source_paths <- sector_plot_sources[[sector_name]]
-
+      
       sector_raw <- bind_rows(lapply(source_paths, function(path) {
         loaded <- load_sector_data(path, app_root)
         if (!is.null(loaded$error)) {
@@ -417,46 +417,46 @@ server <- function(input, output, session) {
         }
         janitor::clean_names(loaded$data)
       }))
-
+      
       if (nrow(sector_raw) == 0 || !"symbol" %in% names(sector_raw)) {
         return(NULL)
       }
-
+      
       sector_filtered <- select_top_x(sector_raw, x = 20)
       tickers <- sector_filtered |>
         pull(symbol) |>
         as.character() |>
         unique() |>
         discard(~ is.na(.x) || .x == "")
-
+      
       if (length(tickers) == 0) {
         return(NULL)
       }
-
+      
       company_df <- sector_filtered |>
         transmute(
           Ticker = as.character(symbol),
           company_name = if ("company_name" %in% names(sector_filtered)) as.character(company_name) else as.character(symbol)
         ) |>
         distinct(Ticker, .keep_all = TRUE)
-
+      
       sector_data <- get_stock_data_wide(tickers, company_df)
       if (nrow(sector_data$price_long) == 0) {
         return(NULL)
       }
-
+      
       sector_data$price_long <- sector_data$price_long |>
         mutate(sector = sector_name)
-
+      
       sector_data$div_long <- sector_data$div_long |>
         mutate(sector = sector_name)
-
+      
       sector_data
     })
-
+    
     names(sector_results) <- names(sector_plot_sources)
     valid_results <- sector_results[!vapply(sector_results, is.null, logical(1))]
-
+    
     if (length(valid_results) == 0) {
       return(list(
         by_sector = list(),
@@ -467,14 +467,14 @@ server <- function(input, output, session) {
         avg_norm_prices = tibble()
       ))
     }
-
+    
     all_prices <- bind_rows(lapply(valid_results, function(x) x$price_long))
     all_divs <- bind_rows(lapply(valid_results, function(x) x$div_long))
-
+    
     avg_prices_yearly <- all_prices |>
       group_by(sector, Year) |>
       summarize(avg_price = mean(Price, na.rm = TRUE), .groups = "drop")
-
+    
     avg_divs_yearly <- if (nrow(all_divs) > 0) {
       all_divs |>
         group_by(sector, Year) |>
@@ -482,17 +482,17 @@ server <- function(input, output, session) {
     } else {
       tibble()
     }
-
+    
     normalized_prices <- all_prices |>
       group_by(Ticker) |>
       arrange(Year, .by_group = TRUE) |>
       mutate(norm_price = Price / first(Price)) |>
       ungroup()
-
+    
     avg_norm_prices <- normalized_prices |>
       group_by(sector, Year) |>
       summarize(avg_norm = mean(norm_price, na.rm = TRUE), .groups = "drop")
-
+    
     list(
       by_sector = valid_results,
       all_prices = all_prices,
@@ -610,7 +610,7 @@ server <- function(input, output, session) {
   output$y_axis_ui <- renderUI({
     choices <- as.character(numeric_columns())
     if (length(choices) == 0) return(NULL)
-
+    
     selected_y <- if (!is.na(choices[2])) choices[2] else choices[1]
     selectInput("y_axis", "Y axis", choices = choices, selected = selected_y)
   })
@@ -704,14 +704,14 @@ server <- function(input, output, session) {
         theme_minimal(base_size = 12)
     }
   })
-
+  
   output$sector_price_plot <- renderPlot({
     plot_data <- stock_plot_data()
     sector_data <- plot_data$by_sector[[input$sector]]
-
+    
     validate(need(!is.null(sector_data), "No stock history was available for the selected sector."))
     validate(need(nrow(sector_data$price_long) > 0, "No stock history was available for the selected sector."))
-
+    
     ggplot(sector_data$price_long, aes(x = Year, y = Price, color = Ticker)) +
       geom_line(linewidth = 1.05) +
       geom_point(size = 1.6) +
@@ -723,14 +723,14 @@ server <- function(input, output, session) {
       theme_minimal(base_size = 13) +
       theme(legend.position = "bottom")
   })
-
+  
   output$sector_div_plot <- renderPlot({
     plot_data <- stock_plot_data()
     sector_data <- plot_data$by_sector[[input$sector]]
-
+    
     validate(need(!is.null(sector_data), "No dividend history was available for the selected sector."))
     validate(need(nrow(sector_data$div_long) > 0, "No dividend history was available for the selected sector."))
-
+    
     ggplot(sector_data$div_long, aes(x = Year, y = Dividend, color = Ticker)) +
       geom_line(linewidth = 1.05) +
       geom_point(size = 1.6) +
@@ -742,11 +742,11 @@ server <- function(input, output, session) {
       theme_minimal(base_size = 13) +
       theme(legend.position = "bottom")
   })
-
+  
   output$avg_sector_price_plot <- renderPlot({
     avg_prices <- stock_plot_data()$avg_prices_yearly
     validate(need(nrow(avg_prices) > 0, "No sector price summary is available yet."))
-
+    
     ggplot(avg_prices, aes(x = Year, y = avg_price, color = sector)) +
       geom_line(linewidth = 1.25) +
       geom_point(size = 2) +
@@ -762,11 +762,11 @@ server <- function(input, output, session) {
         legend.position = "bottom"
       )
   })
-
+  
   output$normalized_growth_plot <- renderPlot({
     avg_norm_prices <- stock_plot_data()$avg_norm_prices
     validate(need(nrow(avg_norm_prices) > 0, "No normalized growth summary is available yet."))
-
+    
     ggplot(avg_norm_prices, aes(x = Year, y = avg_norm, color = sector)) +
       geom_line(linewidth = 1.25) +
       labs(
@@ -781,11 +781,11 @@ server <- function(input, output, session) {
         legend.position = "bottom"
       )
   })
-
+  
   output$avg_sector_div_plot <- renderPlot({
     avg_divs <- stock_plot_data()$avg_divs_yearly
     validate(need(nrow(avg_divs) > 0, "No sector dividend summary is available yet."))
-
+    
     ggplot(avg_divs, aes(x = Year, y = avg_div, color = sector)) +
       geom_line(linewidth = 1.25) +
       geom_point(size = 2) +
