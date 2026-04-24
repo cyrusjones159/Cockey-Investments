@@ -106,7 +106,7 @@ sector_documents <- list(
     "Second Media Screener" =
       paste0(github_base, "/Media/screener_results.xlsx"),
     "Final Media Screener" =
-      paste0(github_base, "/ProductionPartner/fullviewmedia.result.xlsx")
+      paste0(github_base, "/ProductionPartner/media.result.xlsx")
   )
 )
 
