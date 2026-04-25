@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Portal</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #f8f8f8;
+    }
+
+    /* NAVBAR */
+    .navbar {
+      background-color: black;
+      color: white;
+      height: 65px;
+      padding: 20px;
+    }
+
+    .navbutton {
+      background-color: darkgrey;
+      color: lightblue;
+      height: 40px;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+
+    .navspan { float: right; }
+
+    /* CENTERCOURT IFRAME */
+    #centercourt {
+      width: 1600px;
+      height: 1200px; /* adjust as needed */
+      margin: 0 auto;
+      display: block;
+      border: none;
+      background: white;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      background-color: black;
+      color: white;
+      height: 60px;
+      padding: 20px;
+      margin-top: 20px;
+      position: absolute;
+      bottom: 0px;
+      width: 100%;
+    }
+    html {   max-height: 900px;   overflow: hidden;}
+    body {background-color: darkgrey; overflow: hidden; max-height:900px; height: 900px; width: 100%; scroll-behavior   : none;}
+  </style>
+
+  <script>
+    // Load different dashboards into the iframe
+    function loadView(page) {
+      document.getElementById("centercourt").src = page;
+    }
+  </script>
+</head>
+
+<body>
+
+  <!-- NAVBAR -->
+  <div class="navbar">
+    <span class="logo">
+      <img src="./images/cockylogo.png" width="550px" height="70px">
+    </span>
+
+    <span class="navspan">
+      <button class="navbutton" onclick="loadView('interiorindex.html')">LegacyPortal</button>
+      <button class="navbutton" onclick="loadView('twocolumn.html')">StockViews</button>
+      <button class="navbutton" onclick="loadView('sectorviews.html')">SectorViews</button>
+      <button class="navbutton" onclick="loadView('shinyviews.html')">ShinyViews</button>
+    </span>
+  </div>
+
+  <!-- CENTERCOURT IFRAME -->
+  <iframe id="centercourt" src="twocolumn.html"></iframe>
+
+  <!-- FOOTER -->
+  <footer>
+    &copy; Greenville Associates Consulting - Spring 2026<br>
+    John S. Stritzinger - All rights reserved.
+  </footer>
+
+</body>
+</html>

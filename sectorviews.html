@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sector View Dashboard</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 20px; 
+      background: white;
+    }
+
+    /* --- TWO COLUMN LAYOUT --- */
+    #container {
+      display: flex;
+      gap: 20px;
+    }
+
+    #leftColumn {
+      width: 33%;
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 6px;
+      background: #fafafa;
+    }
+
+    #rightColumn {
+      width: 66%;
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 6px;
+      background: #fafafa;
+    }
+
+    #sectorSelector div { margin: 6px 0; }
+    svg { border: 1px solid #ccc; }
+  </style>
+</head>
+
+<body>
+
+<h2>📊 Stock Sector Performance Dashboard</h2>
+
+<div id="container">
+
+  <!-- ===================== LEFT COLUMN ===================== -->
+  <div id="leftColumn">
+    <h3>1. Select a Sector</h3>
+
+    <div id="sectorSelector">
+      <div><input type="radio" name="sector" value="Financials"> Financials</div>
+      <div><input type="radio" name="sector" value="Media & Entertainment"> Media & Entertainment</div>
+      <div><input type="radio" name="sector" value="Autos"> Autos</div>
+      <div><input type="radio" name="sector" value="Industrials"> Industrials</div>
+      <div><input type="radio" name="sector" value="Health Care"> Health Care</div>
+      <div><input type="radio" name="sector" value="Cash/Reits"> Cash/Reits</div>
+    </div>
+  </div>
+
+  <!-- ===================== RIGHT COLUMN ===================== -->
+  <div id="rightColumn">
+    <h3>2. Choose Metric + View Chart</h3>
+
+    <div>
+      <label><input type="radio" name="metric" value="equity" checked> Equity (Price)</label>
+      <label><input type="radio" name="metric" value="dividends"> Dividends</label>
+    </div>
+
+    <br>
+
+    <svg id="chart" width="900" height="500"></svg>
+  </div>
+
+</div>
+
+<script>
+const apiURL = "http://localhost:5000/api/Allstock";
+
+const svg = d3.select("#chart");
+const width = +svg.attr("width");
+const height = +svg.attr("height");
+const margin = { top: 30, right: 120, bottom: 40, left: 60 };
+
+let stockData = [];
+let selectedTickers = new Set();
+
+// Fetch API data
+fetch(apiURL)
+  .then(res => res.json())
+  .then(data => {
+    stockData = data;
+    setupSectorSelector();
+  });
+
+// Setup predefined sector selector
+function setupSectorSelector() {
+  document.querySelectorAll('input[name="sector"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      const selectedSector = radio.value;
+
+      // Filter stocks by sector
+      selectedTickers = new Set(
+        stockData
+          .filter(s => s.sector === selectedSector)
+          .map(s => s.ticker)
+      );
+
+      drawChart();
+    });
+  });
+}
+
+// Extract 10-year series
+function extractSeries(stock, metric) {
+  const years = d3.range(2016, 2027);
+  return years.map(year => ({
+    year,
+    value: metric === "equity"
+      ? stock[`price${year}`]
+      : stock[`div${year}`]
+  }));
+}
+
+// Draw chart
+function drawChart() {
+  svg.selectAll("*").remove();
+
+  const metric = document.querySelector('input[name="metric"]:checked').value;
+  const selectedStocks = stockData.filter(s => selectedTickers.has(s.ticker));
+
+  if (selectedStocks.length === 0) return;
+
+  const allPoints = selectedStocks
+    .map(s => extractSeries(s, metric))
+    .flat()
+    .filter(d => d.value != null);
+
+  const x = d3.scaleLinear()
+    .domain([2016, 2026])
+    .range([margin.left, width - margin.right]);
+
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(allPoints, d => d.value)]).nice()
+    .range([height - margin.bottom, margin.top]);
+
+  const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+  const line = d3.line()
+    .defined(d => d.value != null)
+    .x(d => x(d.year))
+    .y(d => y(d.value));
+
+  // Axes
+  svg.append("g")
+    .attr("transform", `translate(0,${height - margin.bottom})`)
+    .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+
+  svg.append("g")
+    .attr("transform", `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y));
+
+  // Lines + labels
+  selectedStocks.forEach((stock, i) => {
+    const series = extractSeries(stock, metric);
+
+    svg.append("path")
+      .datum(series)
+      .attr("fill", "none")
+      .attr("stroke", color(i))
+      .attr("stroke-width", 2)
+      .attr("d", line);
+
+    const lastValid = [...series].reverse().find(d => d.value != null);
+    if (lastValid) {
+      svg.append("text")
+        .attr("x", x(lastValid.year) + 5)
+        .attr("y", y(lastValid.value))
+        .attr("alignment-baseline", "middle")
+        .attr("fill", color(i))
+        .style("font-size", "12px")
+        .text(stock.ticker);
+    }
+  });
+
+  // Title
+  svg.append("text")
+    .attr("x", width / 2)
+    .attr("y", margin.top - 10)
+    .attr("text-anchor", "middle")
+    .style("font-size", "18px")
+    .text(metric === "equity" ? "Equity (Price) over 10 Years" : "Dividends over 10 Years");
+}
+</script>
+
+</body>
+</html>
+
