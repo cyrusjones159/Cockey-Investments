@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sector View Dashboard</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 20px; 
+      background: white;
+    }
+
+    #container {
+      display: flex;
+      gap: 20px;
+    }
+
+    #leftColumn {
+      width: 150px;
+      flex-shrink: 0;
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 6px;
+      background: #fafafa;
+    }
+
+    #rightColumn {
+      flex: 1;
+      border: 1px solid #ccc;
+      padding: 15px;
+      border-radius: 6px;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    #sectorList div {
+      margin: 6px 0;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 4px;
+    }
+
+    #sectorList div:hover {
+      background: #e0e0e0;
+    }
+
+    #sectorList .active {
+      background: #1976d2;
+      color: white;
+    }
+
+    svg { border: 1px solid #ccc; }
+
+    #chartRow {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    #barChartContainer {
+      flex: 3;
+    }
+
+    #averagesPanel {
+      flex: 1;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: #f7f7f7;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    #averagesPanel h4 {
+      margin: 4px 0;
+    }
+
+    .avg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 16px;
+      row-gap: 4px;
+    }
+
+    .avg-header {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    #stockList table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    #stockList th, #stockList td {
+      border: 1px solid #ddd;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+
+    #stockList th {
+      background: #f0f0f0;
+      text-align: left;
+    }
+
+    button.view-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    button#autoSelectBtn {
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .selected-flag {
+      font-size: 11px;
+      color: #2e7d32;
+      font-weight: bold;
+      margin-left: 6px;
+    }
+
+    /* Modal styles */
+    #modalOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    #modalContent {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 70%;
+      max-width: 900px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    #modalHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    #modalHeader h3 {
+      margin: 0;
+    }
+
+    #modalClose {
+      cursor: pointer;
+      font-size: 18px;
+      border: none;
+      background: none;
+    }
+
+    .modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+      font-size: 14px;
+    }
+
+    .modal-field-label {
+      font-weight: bold;
+    }
+
+    .view-modes {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>📊 Stock Sector Performance Dashboard</h2>
+
+<div id="container">
+
+  <!-- LEFT COLUMN -->
+  <div id="leftColumn">
+    <h3>Sectors</h3>
+    <div id="sectorList"></div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div id="rightColumn">
+
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="view-modes">
+        <span><strong>View:</strong></span>
+        <label><input type="radio" name="viewMode" value="full" checked> Full View</label>
+        <label><input type="radio" name="viewMode" value="cuts"> Cuts Only</label>
+        <label><input type="radio" name="viewMode" value="cuts_all"> Cut + All Others</label>
+      </div>
+      <button id="autoSelectBtn">AutoSelect Top 10</button>
+    </div>
+
+    <div id="chartRow">
+      <div id="barChartContainer">
+        <svg id="barChart" width="800" height="380"></svg>
+      </div>
+      <div id="averagesPanel">
+        <h4>Averages</h4>
+        <div class="avg-grid" id="avgGrid"></div>
+      </div>
+    </div>
+
+    <div id="stockList">
+      <h3>Stocks in Segment</h3>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div id="modalOverlay">
+  <div id="modalContent">
+    <div id="modalHeader">
+      <h3 id="modalTitle">Stock Details</h3>
+      <button id="modalClose">&times;</button>
+    </div>
+
+    <div class="modal-grid" id="modalBody"></div>
+
+    <div style="margin-top:20px;">
+      <label><strong>Selection Status:</strong></label>
+      <select id="modalSelectStatus" style="margin-left:10px; padding:4px;">
+        <option value="True">True</option>
+        <option value="False">False</option>
+        <option value="TBD">TBD</option>
+      </select>
+
+      <button id="modalSaveBtn" style="margin-left:20px; padding:6px 12px; cursor:pointer;">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const apiURL = "https://cockyinvestments-ghehe0a8a7cge7fk.westus3-01.azurewebsites.net/api/Sectorsummaries";
+
+let sectorData = [];
+let selectedSector = null;
+let currentViewMode = "full"; // "full", "cuts", "cuts_all"
+
+// Fetch API data
+fetch(apiURL)
+  .then(res => res.json())
+  .then(data => {
+    sectorData = data;
+    buildSectorList();
+  });
+
+// View mode radio buttons
+document.querySelectorAll('input[name="viewMode"]').forEach(r => {
+  r.addEventListener("change", e => {
+    currentViewMode = e.target.value;
+    if (selectedSector) {
+      const rows = sectorData.filter(r => r.sector === selectedSector);
+      drawBarChart(rows);
+      renderStockList(rows);
+    }
+  });
+});
+
+// Build dynamic sector list with counts (skip unknown/empty)
+function buildSectorList() {
+  const container = document.getElementById("sectorList");
+  container.innerHTML = "";
+
+  const counts = {};
+  sectorData.forEach(row => {
+    if (!row.sector || row.sector.toLowerCase() === "unknown") return;
+    const s = row.sector;
+    counts[s] = (counts[s] || 0) + 1;
+  });
+
+  Object.keys(counts).sort().forEach(sector => {
+    const div = document.createElement("div");
+    div.textContent = `${sector} (${counts[sector]})`;
+    div.dataset.sector = sector;
+
+    div.addEventListener("click", () => {
+      selectedSector = sector;
+      document.querySelectorAll("#sectorList div").forEach(d => d.classList.remove("active"));
+      div.classList.add("active");
+
+      const rows = sectorData.filter(r => r.sector === sector);
+      drawBarChart(rows);
+      renderStockList(rows);
+    });
+
+    container.appendChild(div);
+  });
+}
+
+// Draw bar chart for selected sector with view modes and cut line
+function drawBarChart(rows) {
+  const svgBar = d3.select("#barChart");
+  svgBar.selectAll("*").remove();
+
+  const width = +svgBar.attr("width");
+  const height = +svgBar.attr("height");
+  const margin = { top: 30, right: 20, bottom: 80, left: 60 };
+
+  if (!rows || rows.length === 0) {
+    updateAveragesPanel([], [], currentViewMode);
+    return;
+  }
+
+  const sorted = [...rows].sort((a, b) => b.totalreturn - a.totalreturn);
+  const top10 = sorted.slice(0, 10);
+
+  let data;
+  let showCutLine = false;
+
+  if (currentViewMode === "full") {
+    data = sorted;
+    showCutLine = false;
+  } else if (currentViewMode === "cuts") {
+    data = top10;
+    showCutLine = true;
+  } else { // "cuts_all"
+    data = sorted;
+    showCutLine = true;
+  }
+
+  const metrics = ["avgdividend", "totaldividends", "change", "totalreturn"];
+
+  const chartData = data.map(row => ({
+    id: row.id,
+    ticker: row.ticker,
+    avgdividend: row.avgdividend,
+    totaldividends: row.totaldividends,
+    change: row.change,
+    totalreturn: row.totalreturn
+  }));
+
+  const x0 = d3.scaleBand()
+    .domain(chartData.map(d => d.ticker))
+    .range([margin.left, width - margin.right])
+    .padding(0.2);
+
+  const x1 = d3.scaleBand()
+    .domain(metrics)
+    .range([0, x0.bandwidth()])
+    .padding(0.1);
+
+  const y = d3.scaleLinear()
+    .domain([0, d3.max(chartData, d => Math.max(...metrics.map(m => d[m] || 0)))]).nice()
+    .range([height - margin.bottom, margin.top]);
+
+  const color = d3.scaleOrdinal()
+    .domain(metrics)
+    .range(["#4e79a7", "#f28e2b", "#e15759", "#76b7b2"]);
+
+  // Axes
+  svgBar.append("g")
+    .attr("transform", `translate(0,${height - margin.bottom})`)
+    .call(d3.axisBottom(x0))
+    .selectAll("text")
+    .attr("transform", "rotate(-40)")
+    .style("text-anchor", "end");
+
+  svgBar.append("g")
+    .attr("transform", `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y));
+
+  // Bars
+  svgBar.append("g")
+    .selectAll("g")
+    .data(chartData)
+    .enter()
+    .append("g")
+      .attr("transform", d => `translate(${x0(d.ticker)},0)`)
+    .selectAll("rect")
+    .data(d => metrics.map(m => ({ key: m, value: d[m] })))
+    .enter()
+    .append("rect")
+      .attr("x", d => x1(d.key))
+      .attr("y", d => y(d.value))
+      .attr("width", x1.bandwidth())
+      .attr("height", d => height - margin.bottom - y(d.value))
+      .attr("fill", d => color(d.key));
+
+  // Cut line
+  if (showCutLine && top10.length > 0) {
+    const tenthTicker = top10[Math.min(9, top10.length - 1)].ticker;
+    const xTenth = x0(tenthTicker);
+    const cutX = xTenth + x0.bandwidth();
+
+    const maxVal = d3.max(chartData, d => Math.max(...metrics.map(m => d[m])));
+
+    svgBar.append("line")
+      .attr("x1", cutX)
+      .attr("x2", cutX)
+      .attr("y1", y(maxVal))
+      .attr("y2", height - margin.bottom)
+      .attr("stroke", "black")
+      .attr("stroke-width", 2)
+      .attr("stroke-dasharray", "6,4");
+
+    svgBar.append("text")
+      .attr("x", cutX + 5)
+      .attr("y", margin.top)
+      .style("font-size", "12px")
+      .text("Cut Line");
+  }
+
+  // AutoSelect button uses top10
+  document.getElementById("autoSelectBtn").onclick = () => AutoSelect(top10);
+
+  // Averages panel
+  updateAveragesPanel(rows, top10, currentViewMode);
+}
+
+// PATCH-style AutoSelect: update each stock one at a time with selected = "True"
+async function AutoSelect(top10) {
+  if (!top10 || top10.length === 0) return;
+
+  for (const stock of top10) {
+    try {
+      await fetch(`${apiURL}/${stock.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selected: "True" })
+      });
+
+      const local = sectorData.find(s => s.id === stock.id);
+      if (local) local.selected = "True";
+
+      console.log(`Updated ${stock.ticker} → Selected=True`);
+    } 
+    catch (err) {
+      console.error(`Failed to update ${stock.ticker}`, err);
+    }
+  }
+
+  alert("Top 10 stocks have been marked as Selected=True.");
+  if (selectedSector) {
+    const rows = sectorData.filter(r => r.sector === selectedSector);
+    renderStockList(rows);
+    drawBarChart(rows);
+  }
+}
+
+// Compute and render averages panel
+function updateAveragesPanel(allRows, top10, mode) {
+  const grid = document.getElementById("avgGrid");
+  grid.innerHTML = "";
+
+  if (!allRows || allRows.length === 0) return;
+
+  const sectorRows = allRows;
+
+  let selectedRows;
+  if (mode === "full") {
+    selectedRows = allRows.filter(r => r.selected === "True");
+  } else {
+    selectedRows = top10;
+  }
+
+  const fields = [
+    { key: "avgdividend", label: "Avg Dividend" },
+    { key: "change", label: "Change" },
+    { key: "totalreturn", label: "Total Return" },
+    { key: "fiveyearequityproj", label: "5yr Equity" },
+    { key: "fiveyeardivproj", label: "5yr Div" }
+  ];
+
+  const sectorAvg = computeAverages(sectorRows, fields);
+  const selectedAvg = computeAverages(selectedRows, fields);
+
+  const h1 = document.createElement("div");
+  h1.className = "avg-header";
+  h1.textContent = "Sector Averages";
+
+  const h2 = document.createElement("div");
+  h2.className = "avg-header";
+  h2.textContent = "Selected Averages";
+
+  grid.appendChild(h1);
+  grid.appendChild(h2);
+
+  fields.forEach(f => {
+    const left = document.createElement("div");
+    left.textContent = `${f.label}: ${formatAvg(sectorAvg[f.key])}`;
+
+    const right = document.createElement("div");
+    right.textContent = `${f.label}: ${formatAvg(selectedAvg[f.key])}`;
+
+    grid.appendChild(left);
+    grid.appendChild(right);
+  });
+}
+
+function computeAverages(rows, fields) {
+  const result = {};
+  fields.forEach(f => {
+    if (!rows || rows.length === 0) {
+      result[f.key] = null;
+      return;
+    }
+    let sum = 0;
+    let count = 0;
+    rows.forEach(r => {
+      const v = r[f.key];
+      if (v != null && !isNaN(v)) {
+        sum += v;
+        count++;
+      }
+    });
+    result[f.key] = count > 0 ? sum / count : null;
+  });
+  return result;
+}
+
+function formatAvg(v) {
+  if (v == null || isNaN(v)) return "—";
+  return v.toFixed(2);
+}
+
+// Render stock list
+function renderStockList(rows) {
+  const container = document.getElementById("stockList");
+  container.innerHTML = "<h3>Stocks in Segment</h3>";
+
+  if (!rows || rows.length === 0) {
+    const p = document.createElement("p");
+    p.textContent = "No stocks found for this segment.";
+    container.appendChild(p);
+    return;
+  }
+
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
+
+  thead.innerHTML = `
+    <tr>
+      <th>Ticker</th>
+      <th>Company</th>
+      <th>Total Return</th>
+      <th>Change</th>
+      <th>Selected</th>
+      <th>Actions</th>
+    </tr>
+  `;
+
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+
+    const tdTicker = document.createElement("td");
+    tdTicker.textContent = row.ticker;
+
+    const tdCompany = document.createElement("td");
+    tdCompany.textContent = row.company;
+
+    const tdTotalReturn = document.createElement("td");
+    tdTotalReturn.textContent = row.totalreturn != null ? row.totalreturn.toFixed(2) : "";
+
+    const tdChange = document.createElement("td");
+    tdChange.textContent = row.change != null ? row.change.toFixed(2) : "";
+
+    const tdSelected = document.createElement("td");
+    tdSelected.textContent = row.selected || "";
+    if (row.selected === "True") {
+      const span = document.createElement("span");
+      span.className = "selected-flag";
+      span.textContent = "✔";
+      tdSelected.appendChild(span);
+    }
+
+    const tdActions = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.textContent = "View Details";
+    btn.className = "view-btn";
+    btn.addEventListener("click", () => openModal(row));
+    tdActions.appendChild(btn);
+
+    tr.appendChild(tdTicker);
+    tr.appendChild(tdCompany);
+    tr.appendChild(tdTotalReturn);
+    tr.appendChild(tdChange);
+    tr.appendChild(tdSelected);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+// Modal logic
+const modalOverlay = document.getElementById("modalOverlay");
+const modalClose = document.getElementById("modalClose");
+const modalTitle = document.getElementById("modalTitle");
+const modalBody = document.getElementById("modalBody");
+
+modalClose.addEventListener("click", () => {
+  modalOverlay.style.display = "none";
+});
+
+modalOverlay.addEventListener("click", (e) => {
+  if (e.target === modalOverlay) {
+    modalOverlay.style.display = "none";
+  }
+});
+
+function openModal(row) {
+  modalTitle.textContent = `${row.ticker} – ${row.company}`;
+
+  const fields = [
+    ["Company", row.company],
+    ["Ticker", row.ticker],
+    ["Sector", row.sector],
+    ["Avg Dividend", row.avgdividend],
+    ["Total Dividends", row.totaldividends],
+    ["Price Start", row.priceStart],
+    ["Price End", row.priceEnd],
+    ["Change", row.change],
+    ["Total Return", row.totalreturn],
+    ["Total Return / 10", row.totalreturnover10],
+    ["Shares (500)", row.shares500],
+    ["Total Spend", row.totalspend],
+    ["5-Year Equity Proj", row.fiveyearequityproj],
+    ["5-Year Div Proj", row.fiveyeardivproj],
+    ["Total 5-Year View", row.totalfiveyearview],
+    ["Selected", row.selected]
+  ];
+
+  modalBody.innerHTML = "";
+
+  fields.forEach(([label, value]) => {
+    const labelDiv = document.createElement("div");
+    labelDiv.className = "modal-field-label";
+    labelDiv.textContent = label;
+
+    const valueDiv = document.createElement("div");
+    valueDiv.textContent = value != null && value !== "" ? value : "—";
+
+    modalBody.appendChild(labelDiv);
+    modalBody.appendChild(valueDiv);
+  });
+
+  document.getElementById("modalSelectStatus").value = row.selected || "TBD";
+  document.getElementById("modalSaveBtn").onclick = () => saveModalSelection(row);
+
+  modalOverlay.style.display = "flex";
+}
+
+// Save selection status from modal
+async function saveModalSelection(row) {
+  const newValue = document.getElementById("modalSelectStatus").value;
+
+  try {
+    await fetch(`${apiURL}/${row.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selected: newValue })
+    });
+
+    const local = sectorData.find(s => s.id === row.id);
+    if (local) local.selected = newValue;
+
+    alert(`Updated ${row.ticker} → Selected = ${newValue}`);
+
+    if (selectedSector) {
+      const rows = sectorData.filter(r => r.sector === selectedSector);
+      renderStockList(rows);
+      drawBarChart(rows);
+    }
+
+    modalOverlay.style.display = "none";
+  }
+  catch (err) {
+    console.error("Failed to update selection", err);
+    alert("Error updating selection.");
+  }
+}
+</script>
+
+</body>
+</html>
