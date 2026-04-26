@@ -17,6 +17,10 @@ A comprehensive stock pricing analysis project for STAT 542, examining investmen
 ### Key Resources
 - **Stage1Filtering/** - Initial screening results across all sectors
 - **PresentationDocuments/** - Project presentation materials and documentation
+- **ProductionBuild/** This was the EpochI view where Fidelity Screening Processes were the only Inputs.
+- **ProductionPartner/** This was the EpochII view where Fidelity Screening Processes were augmented by the Team Directly and removed from Preliminary Views (Before R Production Processes).
+- index.html on the root is a Web App which runs both the Shiny App, and Javascript D3 Libraries to an Azure Cloud DB.
+- app.R is the most recent Shiny App Architecture.
 
 ## Contents
 ### Automotive 
