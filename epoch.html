@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Epoch Sector Comparison</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: white;
+    }
+
+    h2 {
+      margin-bottom: 4px;
+    }
+
+    #subtitle {
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 16px;
+    }
+
+    #gridContainer {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr); /* 3 columns = 3 epochs */
+      grid-auto-rows: 260px;                 /* 5 rows = 5 metrics → 5 x 3 form */
+      gap: 16px;
+    }
+
+    .cell {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 6px;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cell-title {
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    svg {
+      flex: 1;
+    }
+
+    .axis text {
+      font-size: 9px;
+    }
+
+    .axis path,
+    .axis line {
+      stroke: #999;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📊 Epoch Sector Comparison</h2>
+<div id="subtitle">
+  Epoch1 = All stocks · Epoch2 = Top 10 by Total Return · Epoch3 = Selected stocks<br>
+  Grid: 5 metrics × 3 epochs (Y = sector, X = metric value)
+</div>
+
+<div id="gridContainer"></div>
+
+<script>
+const apiURL = "https://cockyinvestments-ghehe0a8a7cge7fk.westus3-01.azurewebsites.net/api/Sectorsummaries";
+
+const metrics = [
+  { key: "avgdividend",       label: "Avg Dividend" },
+  { key: "change",            label: "Change" },
+  { key: "totalreturn",       label: "Total Return" },
+  { key: "fiveyearequityproj",label: "5yr Equity" },
+  { key: "fiveyeardivproj",   label: "5yr Div" }
+];
+
+const epochs = [
+  { id: "epoch1", label: "Epoch1 · All Stocks" },
+  { id: "epoch2", label: "Epoch2 · Top 10 TR" },
+  { id: "epoch3", label: "Epoch3 · Selected" }
+];
+
+let data = [];
+
+fetch(apiURL)
+  .then(r => r.json())
+  .then(d => {
+    data = d;
+    buildEpochGrid();
+  });
+
+function buildEpochGrid() {
+  const container = document.getElementById("gridContainer");
+  container.innerHTML = "";
+
+  // Get list of sectors (skip null/unknown)
+  const sectorSet = new Set();
+  data.forEach(r => {
+    if (!r.sector || r.sector.toLowerCase() === "unknown") return;
+    sectorSet.add(r.sector);
+  });
+  const sectors = Array.from(sectorSet).sort();
+
+  // Precompute aggregated values: metric → epoch → [{sector, value}]
+  const aggregated = {};
+  metrics.forEach(m => {
+    aggregated[m.key] = {};
+    epochs.forEach(e => {
+      aggregated[m.key][e.id] = computeSectorMetricForEpoch(m.key, e.id, sectors);
+    });
+  });
+
+  // Build 5 x 3 grid: metrics as rows, epochs as columns
+  metrics.forEach(metric => {
+    epochs.forEach(epoch => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+
+      const title = document.createElement("div");
+      title.className = "cell-title";
+      title.textContent = `${metric.label} · ${epoch.label}`;
+      cell.appendChild(title);
+
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", "210");
+      cell.appendChild(svg);
+
+      container.appendChild(cell);
+
+      drawSmallChart(
+        d3.select(svg),
+        aggregated[metric.key][epoch.id],
+        sectors,
+        metric.label
+      );
+    });
+  });
+}
+
+// Compute sector-level average for a given metric and epoch
+function computeSectorMetricForEpoch(metricKey, epochId, sectors) {
+  const result = [];
+
+  sectors.forEach(sector => {
+    // All rows in this sector
+    const sectorRows = data.filter(r => r.sector === sector);
+
+    let rowsForEpoch;
+    if (epochId === "epoch1") {
+      // All stocks
+      rowsForEpoch = sectorRows;
+    } else if (epochId === "epoch2") {
+      // Top 10 by totalreturn
+      rowsForEpoch = [...sectorRows]
+        .sort((a, b) => (b.totalreturn || 0) - (a.totalreturn || 0))
+        .slice(0, 10);
+    } else {
+      // epoch3: selected stocks
+      rowsForEpoch = sectorRows.filter(r => r.selected === "True");
+    }
+
+    if (!rowsForEpoch || rowsForEpoch.length === 0) {
+      result.push({ sector, value: null });
+      return;
+    }
+
+    let sum = 0;
+    let count = 0;
+    rowsForEpoch.forEach(r => {
+      const v = r[metricKey];
+      if (v != null && !isNaN(v)) {
+        sum += v;
+        count++;
+      }
+    });
+
+    const avg = count > 0 ? sum / count : null;
+    result.push({ sector, value: avg });
+  });
+
+  return result;
+}
+
+// Draw one small horizontal bar chart (Y = sector, X = value)
+function drawSmallChart(svg, rows, sectors, metricLabel) {
+  const width = svg.node().clientWidth || 260;
+  const height = +svg.attr("height");
+  const margin = { top: 10, right: 10, bottom: 20, left: 70 };
+
+  svg.selectAll("*").remove();
+
+  const validValues = rows.map(d => d.value).filter(v => v != null && !isNaN(v));
+  const maxVal = validValues.length ? d3.max(validValues) : 0;
+
+  const x = d3.scaleLinear()
+    .domain([0, maxVal || 1]).nice()
+    .range([margin.left, width - margin.right]);
+
+  const y = d3.scaleBand()
+    .domain(sectors)
+    .range([margin.top, height - margin.bottom])
+    .padding(0.2);
+
+  const g = svg.append("g");
+
+  // Axes
+  g.append("g")
+    .attr("class", "axis")
+    .attr("transform", `translate(0,${height - margin.bottom})`)
+    .call(d3.axisBottom(x).ticks(3).tickSizeOuter(0));
+
+  g.append("g")
+    .attr("class", "axis")
+    .attr("transform", `translate(${margin.left},0)`)
+    .call(d3.axisLeft(y).tickSizeOuter(0));
+
+  // Bars
+  g.selectAll("rect")
+    .data(rows)
+    .enter()
+    .append("rect")
+      .attr("x", d => x(0))
+      .attr("y", d => y(d.sector))
+      .attr("height", y.bandwidth())
+      .attr("width", d => d.value == null ? 0 : x(d.value) - x(0))
+      .attr("fill", "#4e79a7");
+}
+</script>
+
+</body>
+</html>
