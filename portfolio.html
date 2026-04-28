@@ -4,11 +4,13 @@
   <meta charset="UTF-8" />
   <title>Portfolio Facets</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <!-- Bootstrap 5 -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
+
   <style>
     body {
       padding: 20px;
@@ -16,7 +18,7 @@
     .epoch-cell {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-size: 0.9rem;
-      cursor: pointer;
+      vertical-align: top;
     }
     .epoch-quad {
       display: grid;
@@ -39,6 +41,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1 class="mb-4">Portfolio Facets</h1>
@@ -54,15 +57,15 @@
             <th scope="col">Sector</th>
             <th scope="col">
               Epoch 1<br />
-              <small>count | target | actual | projected</small>
+              <small>epoch count | target | actual | projected</small>
             </th>
             <th scope="col">
               Epoch 2<br />
-              <small>count | target | actual | projected</small>
+              <small>epoch count | target | actual | projected</small>
             </th>
             <th scope="col">
               Epoch 3<br />
-              <small>count | target | actual | projected</small>
+              <small>epoch count | target | actual | projected</small>
             </th>
             <th scope="col">
               Ratios<br />
@@ -70,27 +73,27 @@
             </th>
           </tr>
         </thead>
-        <tbody id="portfolioBody">
-          <!-- rows injected by JS -->
-        </tbody>
+
+        <tbody id="portfolioBody"></tbody>
+
         <tfoot>
-          <tr id="totalsRow">
-            <!-- totals injected by JS -->
-          </tr>
+          <tr id="totalsRow"></tr>
         </tfoot>
       </table>
     </div>
   </div>
 
-  <!-- Modal for share breakout -->
+  <!-- Modal for epoch-specific stock breakout -->
   <div class="modal fade" id="breakoutModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
+
         <div class="modal-header">
           <h5 class="modal-title" id="breakoutTitle">Share Breakout</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"
                   aria-label="Close"></button>
         </div>
+
         <div class="modal-body">
           <table class="table table-sm table-bordered">
             <thead>
@@ -101,22 +104,157 @@
                 <th>Actual</th>
               </tr>
             </thead>
-            <tbody id="breakoutBody">
-              <!-- rows injected by JS -->
-            </tbody>
+            <tbody id="breakoutBody"></tbody>
           </table>
         </div>
+
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary"
                   data-bs-dismiss="modal">Close</button>
         </div>
+
       </div>
     </div>
   </div>
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- External portfolio logic -->
+
+  <!-- Portfolio logic -->
   <script src="portfolio.js"></script>
+
+  <script>
+    // ---- TABLE RENDERING -----------------------------------------------------
+
+    function buildTable() {
+      const tbody = document.getElementById("portfolioBody");
+      const trowTotals = document.getElementById("totalsRow");
+      tbody.innerHTML = "";
+      trowTotals.innerHTML = "";
+
+      const sectors = computeAllSectors();
+      const totals = computeTotals(sectors);
+
+      sectors.forEach(s => {
+        const tr = document.createElement("tr");
+
+        // Sector label already includes total stock count, e.g. "FINANCIALS (21)"
+        const tdSector = document.createElement("td");
+        tdSector.textContent = s.sector;
+        tr.appendChild(tdSector);
+
+        function buildEpochCell(epochKey, epochLabel) {
+          const td = document.createElement("td");
+          td.className = "epoch-cell";
+
+          td.innerHTML = makeEpochQuad(
+            s.epochCounts[epochKey],          // epoch-specific count
+            totals[epochKey].target,          // same target for all sectors (50k)
+            s.actual[epochKey],
+            s.projected[epochKey]
+          );
+
+          const btn = document.createElement("button");
+          btn.className = "btn btn-sm btn-outline-primary mt-1";
+          btn.textContent = "View Stocks";
+          btn.dataset.sector = s.sector;
+          btn.dataset.epoch = epochKey;
+          btn.addEventListener("click", onEpochButtonClick);
+
+          td.appendChild(btn);
+          return td;
+        }
+
+        tr.appendChild(buildEpochCell("epoch1", "Epoch 1"));
+        tr.appendChild(buildEpochCell("epoch2", "Epoch 2"));
+        tr.appendChild(buildEpochCell("epoch3", "Epoch 3"));
+
+        // Ratios
+        const tdRatios = document.createElement("td");
+        tdRatios.className = "ratios-cell";
+
+        if (s.sector.toUpperCase().startsWith("CASH")) {
+          tdRatios.textContent = "N/A";
+        } else {
+          const rE2E1 = ratio(s.projected.epoch2, s.projected.epoch1);
+          const rE3E1 = ratio(s.projected.epoch3, s.projected.epoch1);
+          tdRatios.innerHTML = `E2/E1: ${rE2E1}&nbsp;&nbsp;E3/E1: ${rE3E1}`;
+        }
+
+        tr.appendChild(tdRatios);
+        tbody.appendChild(tr);
+      });
+
+      // Totals row
+      const tdLabel = document.createElement("td");
+      tdLabel.textContent = "TOTALS";
+      trowTotals.appendChild(tdLabel);
+
+      function buildTotalsEpochCell(epochKey) {
+        const td = document.createElement("td");
+        td.className = "epoch-cell";
+        const t = totals[epochKey];
+
+        td.innerHTML = makeEpochQuad(
+          "Totals",
+          t.target,
+          t.actual,
+          t.projected
+        );
+        return td;
+      }
+
+      trowTotals.appendChild(buildTotalsEpochCell("epoch1"));
+      trowTotals.appendChild(buildTotalsEpochCell("epoch2"));
+      trowTotals.appendChild(buildTotalsEpochCell("epoch3"));
+
+      const tdRatiosTotal = document.createElement("td");
+      tdRatiosTotal.textContent = "—";
+      trowTotals.appendChild(tdRatiosTotal);
+    }
+
+    // ---- MODAL HANDLER ------------------------------------------------------
+
+    function onEpochButtonClick(e) {
+      const sectorName = e.currentTarget.dataset.sector;
+      const epochKey = e.currentTarget.dataset.epoch;
+
+      const sectors = computeAllSectors();
+      const sector = sectors.find(s => s.sector === sectorName);
+      if (!sector) return;
+
+      const stockList = sector.stocks[epochKey];
+
+      const title = document.getElementById("breakoutTitle");
+      const body = document.getElementById("breakoutBody");
+
+      title.textContent = `${sectorName} — ${epochKey.toUpperCase()} Stocks`;
+      body.innerHTML = "";
+
+      stockList.forEach(st => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${st.ticker}</td>
+          <td>${st.shares ?? "-"}</td>
+          <td>${formatNumber(st.price)}</td>
+          <td>${formatNumber(st.totalspend ?? st.actual)}</td>
+        `;
+        body.appendChild(tr);
+      });
+
+      const modalEl = document.getElementById("breakoutModal");
+      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    }
+
+    // ---- INIT ---------------------------------------------------------------
+
+    document.getElementById("loadBtn").addEventListener("click", () => {
+      buildTable();
+    });
+
+    buildTable();
+  </script>
+
 </body>
 </html>
