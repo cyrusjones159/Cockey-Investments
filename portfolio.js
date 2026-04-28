@@ -1,29 +1,21 @@
 // ---- CONFIG -------------------------------------------------------------
-//----JSS VERSION 5.1 - 
+//VERSION 5.3 JOHN S, STRITZINGER
 
 const TOTAL_PORTFOLIO_TARGET = 50000;
 const FIXED_SECTOR_TARGET = 10000;
+const API_URL =
+  "https://cockyinvestments-ghehe0a8a7cge7fk.westus3-01.azurewebsites.net/api/Sectorsummaries";
 
-// IMPORTANT:
-// Replace these arrays with your real JSON-loaded arrays.
-// Each item must match your JSON structure:
-// {
-//   ticker,
-//   sector,
-//   priceStart,
-//   priceEnd,
-//   totalspend,
-//   totalreturn,
-//   totalfiveyearview,
-//   selected
-// }
-const SECTOR_DATA = {
-  AUTOS: [],
-  FINANCIALS: [],
-  MEDIA: [],
-  HEALTH: [],
-  REITS: []
+// Will be filled from API
+let SECTOR_DATA = {
+  autos: [],
+  financials: [],
+  health: [],
+  media: [],
+  reits: []
 };
+
+let GLOBAL_TOP10 = []; // top 10 by totalreturn across all stocks
 
 // ---- HELPERS ------------------------------------------------------------
 
@@ -58,7 +50,12 @@ function makeEpochQuad(label, target, actual, projected) {
 }
 
 function normalizeSelected(val) {
-  return String(val).toLowerCase() === "true";
+  if (val === true) return true;
+  if (typeof val === "string") {
+    const v = val.trim().toLowerCase();
+    return v === "true" || v === "yes" || v === "y";
+  }
+  return false;
 }
 
 function safePrice(t) {
@@ -70,9 +67,17 @@ function safeFiveYear(t) {
   return t.totalfiveyearview ?? 0;
 }
 
+function isInGlobalTop10(stock) {
+  if (!GLOBAL_TOP10 || GLOBAL_TOP10.length === 0) return false;
+  if (stock.id != null) {
+    return GLOBAL_TOP10.some(s => s.id === stock.id);
+  }
+  return GLOBAL_TOP10.some(s => s.ticker === stock.ticker);
+}
+
 // ---- CORE PER-EPOCH BUILDERS -------------------------------------------
 
-// For Autos, Financials, Health, Media (fixed 10k target, CEILING)
+// Fixed 10k sectors: autos, financials, health, media
 function buildEpochStocksFixedTarget(tickers, sectorTarget) {
   const N = tickers.length;
   if (N === 0) {
@@ -117,7 +122,7 @@ function buildEpochStocksFixedTarget(tickers, sectorTarget) {
   };
 }
 
-// For REITS (balance sector, FLOOR)
+// REITS: balance sector
 function buildEpochStocksReits(tickers, reitsTarget) {
   const N = tickers.length;
   if (N === 0 || reitsTarget <= 0) {
@@ -165,7 +170,7 @@ function buildEpochStocksReits(tickers, reitsTarget) {
 
 // ---- SECTOR BUILDERS ----------------------------------------------------
 
-// Fixed 10k sectors: Autos, Financials, Health, Media
+// Fixed 10k sectors: autos, financials, health, media
 function computeFixedSector(displayName, tickers) {
   // Epoch 1: all
   const epoch1Tickers = tickers;
@@ -173,16 +178,17 @@ function computeFixedSector(displayName, tickers) {
   // Epoch 2: selected
   const epoch2Tickers = tickers.filter(t => normalizeSelected(t.selected));
 
-  // Epoch 3: top 10 selected by totalreturn
-  const epoch3Tickers = [...epoch2Tickers]
-    .sort((a, b) => b.totalreturn - a.totalreturn)
-    .slice(0, 10);
+  // Epoch 3: global top 10 by totalreturn (from all stocks), restricted to this sector
+  const epoch3Tickers = epoch1Tickers.filter(t => isInGlobalTop10(t));
 
   const e1 = buildEpochStocksFixedTarget(epoch1Tickers, FIXED_SECTOR_TARGET);
   const e2 = buildEpochStocksFixedTarget(epoch2Tickers, FIXED_SECTOR_TARGET);
   const e3 = buildEpochStocksFixedTarget(epoch3Tickers, FIXED_SECTOR_TARGET);
 
   const sectorLabel = `${displayName} (${epoch1Tickers.length})`;
+
+  // Hypothesis: Model 2 = actualEpoch1 * 1.2
+  const hypothesis = e1.actual * 1.2;
 
   return {
     sector: sectorLabel,
@@ -202,6 +208,7 @@ function computeFixedSector(displayName, tickers) {
       epoch2: e2.projected,
       epoch3: e3.projected
     },
+    hypothesis,
     stocks: {
       epoch1: e1.stocks,
       epoch2: e2.stocks,
@@ -218,10 +225,8 @@ function computeReitsSector(displayName, tickers, baseSectors) {
   // Epoch 2: selected
   const epoch2Tickers = tickers.filter(t => normalizeSelected(t.selected));
 
-  // Epoch 3: top 10 selected by totalreturn
-  const epoch3Tickers = [...epoch2Tickers]
-    .sort((a, b) => b.totalreturn - a.totalreturn)
-    .slice(0, 10);
+  // Epoch 3: global top 10 by totalreturn, restricted to this sector
+  const epoch3Tickers = epoch1Tickers.filter(t => isInGlobalTop10(t));
 
   function totalActualOfBase(epochKey) {
     return baseSectors.reduce((sum, s) => sum + s.actual[epochKey], 0);
@@ -239,9 +244,10 @@ function computeReitsSector(displayName, tickers, baseSectors) {
 
   const sectorLabel = `${displayName} (${epoch1Tickers.length})`;
 
+  const hypothesis = e1.actual * 1.2;
+
   return {
     sector: sectorLabel,
-    // Display target is always 10k, even though true target is smaller
     target: FIXED_SECTOR_TARGET,
     epochCounts: {
       epoch1: e1.count,
@@ -258,6 +264,7 @@ function computeReitsSector(displayName, tickers, baseSectors) {
       epoch2: e2.projected,
       epoch3: e3.projected
     },
+    hypothesis,
     stocks: {
       epoch1: e1.stocks,
       epoch2: e2.stocks,
@@ -311,12 +318,14 @@ function computeCashSector(baseSectorsPlusReits) {
     }]
   };
 
+  // For cash, hypothesis doesn't really apply; set to 0
   return {
-    sector: "Cash (1)",
-    target: cashActual.epoch1, // display as its own amount
+    sector: "cash (1)",
+    target: cashActual.epoch1,
     epochCounts: { epoch1: 1, epoch2: 1, epoch3: 1 },
     actual: cashActual,
     projected: cashProjected,
+    hypothesis: 0,
     stocks: cashStocks
   };
 }
@@ -324,20 +333,17 @@ function computeCashSector(baseSectorsPlusReits) {
 // ---- PUBLIC API USED BY RENDERING --------------------------------------
 
 function computeAllSectors() {
-  // 1–4: fixed 10k sectors
-  const autos      = computeFixedSector("Autos",      SECTOR_DATA.AUTOS);
-  const financials = computeFixedSector("Financials", SECTOR_DATA.FINANCIALS);
-  const health     = computeFixedSector("Health",     SECTOR_DATA.HEALTH);
-  const media      = computeFixedSector("Media",      SECTOR_DATA.MEDIA);
+  const autos      = computeFixedSector("autos",      SECTOR_DATA.autos);
+  const financials = computeFixedSector("financials", SECTOR_DATA.financials);
+  const health     = computeFixedSector("health",     SECTOR_DATA.health);
+  const media      = computeFixedSector("media",      SECTOR_DATA.media);
 
   const baseSectors = [autos, financials, health, media];
 
-  // 5: REITS as balance
-  const reits = computeReitsSector("REITs", SECTOR_DATA.REITS, baseSectors);
+  const reits = computeReitsSector("reits", SECTOR_DATA.reits, baseSectors);
 
   const basePlusReits = [...baseSectors, reits];
 
-  // 6: CASH as leftover
   const cash = computeCashSector(basePlusReits);
 
   return [...basePlusReits, cash];
@@ -380,7 +386,6 @@ function buildTable() {
   sectors.forEach(s => {
     const tr = document.createElement("tr");
 
-    // Sector label already includes total stock count, e.g. "Financials (22)"
     const tdSector = document.createElement("td");
     tdSector.textContent = s.sector;
     tr.appendChild(tdSector);
@@ -390,8 +395,8 @@ function buildTable() {
       td.className = "epoch-cell";
 
       td.innerHTML = makeEpochQuad(
-        s.epochCounts[epochKey],   // epoch-specific count
-        s.target,                  // 10k for first 4, 10k for REITs, cash amount for Cash
+        s.epochCounts[epochKey],
+        s.target,
         s.actual[epochKey],
         s.projected[epochKey]
       );
@@ -411,23 +416,27 @@ function buildTable() {
     tr.appendChild(buildEpochCell("epoch2"));
     tr.appendChild(buildEpochCell("epoch3"));
 
-    // Ratios
     const tdRatios = document.createElement("td");
     tdRatios.className = "ratios-cell";
 
-    if (s.sector.toUpperCase().startsWith("CASH")) {
+    if (s.sector.toLowerCase().startsWith("cash")) {
       tdRatios.textContent = "N/A";
     } else {
       const rE2E1 = ratio(s.projected.epoch2, s.projected.epoch1);
       const rE3E1 = ratio(s.projected.epoch3, s.projected.epoch1);
-      tdRatios.innerHTML = `E2/E1: ${rE2E1}&nbsp;&nbsp;E3/E1: ${rE3E1}`;
+
+      const hyp = s.hypothesis || 0;
+      const rE2H = hyp ? ratio(s.projected.epoch2, hyp) : "—";
+      const rE3H = hyp ? ratio(s.projected.epoch3, hyp) : "—";
+
+      tdRatios.textContent =
+        `E2/E1: ${rE2E1} | E3/E1: ${rE3E1} | E2/H: ${rE2H} | E3/H: ${rE3H}`;
     }
 
     tr.appendChild(tdRatios);
     tbody.appendChild(tr);
   });
 
-  // Totals row
   const tdLabel = document.createElement("td");
   tdLabel.textContent = "TOTALS";
   trowTotals.appendChild(tdLabel);
@@ -439,7 +448,7 @@ function buildTable() {
 
     td.innerHTML = makeEpochQuad(
       "Totals",
-      t.target,       // always 50k at totals level
+      t.target,
       t.actual,
       t.projected
     );
@@ -490,13 +499,58 @@ function onEpochButtonClick(e) {
   modal.show();
 }
 
+// ---- DATA LOADING -------------------------------------------------------
+
+async function loadSectorData() {
+  try {
+    const response = await fetch(API_URL, {
+      method: "GET",
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      console.error("API error:", response.status, response.statusText);
+      return;
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      console.error("Unexpected API shape, expected array");
+      return;
+    }
+
+    // Group by sector (lowercase)
+    SECTOR_DATA = {
+      autos: data.filter(x => (x.sector || "").toLowerCase() === "autos"),
+      financials: data.filter(x => (x.sector || "").toLowerCase() === "financials"),
+      health: data.filter(x => (x.sector || "").toLowerCase() === "health"),
+      media: data.filter(x => (x.sector || "").toLowerCase() === "media"),
+      reits: data.filter(x => (x.sector || "").toLowerCase() === "reits")
+    };
+
+    // Compute global top 10 by totalreturn across all stocks
+    const allStocks = data.slice();
+    allStocks.sort((a, b) => (b.totalreturn || 0) - (a.totalreturn || 0));
+    GLOBAL_TOP10 = allStocks.slice(0, 10);
+
+    buildTable();
+  } catch (err) {
+    console.error("Error loading sector data:", err);
+  }
+}
+
 // ---- INIT ---------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
   const loadBtn = document.getElementById("loadBtn");
   if (loadBtn) {
-    loadBtn.addEventListener("click", buildTable);
+    loadBtn.addEventListener("click", () => {
+      loadSectorData();
+    });
   }
-  // Initial render
-  buildTable();
+
+  // Initial load
+  loadSectorData();
 });
