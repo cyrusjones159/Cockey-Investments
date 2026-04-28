@@ -1,4 +1,5 @@
 // ---- CONFIG -------------------------------------------------------------
+//----JSS VERSION 5.1 - 
 
 const TOTAL_PORTFOLIO_TARGET = 50000;
 const FIXED_SECTOR_TARGET = 10000;
@@ -320,7 +321,7 @@ function computeCashSector(baseSectorsPlusReits) {
   };
 }
 
-// ---- PUBLIC API USED BY HTML -------------------------------------------
+// ---- PUBLIC API USED BY RENDERING --------------------------------------
 
 function computeAllSectors() {
   // 1–4: fixed 10k sectors
@@ -362,3 +363,140 @@ function computeTotals(sectors) {
 
   return totals;
 }
+
+// ---- RENDERING / DOM WIRING --------------------------------------------
+
+function buildTable() {
+  const tbody = document.getElementById("portfolioBody");
+  const trowTotals = document.getElementById("totalsRow");
+  if (!tbody || !trowTotals) return;
+
+  tbody.innerHTML = "";
+  trowTotals.innerHTML = "";
+
+  const sectors = computeAllSectors();
+  const totals = computeTotals(sectors);
+
+  sectors.forEach(s => {
+    const tr = document.createElement("tr");
+
+    // Sector label already includes total stock count, e.g. "Financials (22)"
+    const tdSector = document.createElement("td");
+    tdSector.textContent = s.sector;
+    tr.appendChild(tdSector);
+
+    function buildEpochCell(epochKey) {
+      const td = document.createElement("td");
+      td.className = "epoch-cell";
+
+      td.innerHTML = makeEpochQuad(
+        s.epochCounts[epochKey],   // epoch-specific count
+        s.target,                  // 10k for first 4, 10k for REITs, cash amount for Cash
+        s.actual[epochKey],
+        s.projected[epochKey]
+      );
+
+      const btn = document.createElement("button");
+      btn.className = "btn btn-sm btn-outline-primary mt-1";
+      btn.textContent = "View Stocks";
+      btn.dataset.sector = s.sector;
+      btn.dataset.epoch = epochKey;
+      btn.addEventListener("click", onEpochButtonClick);
+
+      td.appendChild(btn);
+      return td;
+    }
+
+    tr.appendChild(buildEpochCell("epoch1"));
+    tr.appendChild(buildEpochCell("epoch2"));
+    tr.appendChild(buildEpochCell("epoch3"));
+
+    // Ratios
+    const tdRatios = document.createElement("td");
+    tdRatios.className = "ratios-cell";
+
+    if (s.sector.toUpperCase().startsWith("CASH")) {
+      tdRatios.textContent = "N/A";
+    } else {
+      const rE2E1 = ratio(s.projected.epoch2, s.projected.epoch1);
+      const rE3E1 = ratio(s.projected.epoch3, s.projected.epoch1);
+      tdRatios.innerHTML = `E2/E1: ${rE2E1}&nbsp;&nbsp;E3/E1: ${rE3E1}`;
+    }
+
+    tr.appendChild(tdRatios);
+    tbody.appendChild(tr);
+  });
+
+  // Totals row
+  const tdLabel = document.createElement("td");
+  tdLabel.textContent = "TOTALS";
+  trowTotals.appendChild(tdLabel);
+
+  function buildTotalsEpochCell(epochKey) {
+    const td = document.createElement("td");
+    td.className = "epoch-cell";
+    const t = totals[epochKey];
+
+    td.innerHTML = makeEpochQuad(
+      "Totals",
+      t.target,       // always 50k at totals level
+      t.actual,
+      t.projected
+    );
+    return td;
+  }
+
+  trowTotals.appendChild(buildTotalsEpochCell("epoch1"));
+  trowTotals.appendChild(buildTotalsEpochCell("epoch2"));
+  trowTotals.appendChild(buildTotalsEpochCell("epoch3"));
+
+  const tdRatiosTotal = document.createElement("td");
+  tdRatiosTotal.textContent = "—";
+  trowTotals.appendChild(tdRatiosTotal);
+}
+
+function onEpochButtonClick(e) {
+  const sectorName = e.currentTarget.dataset.sector;
+  const epochKey = e.currentTarget.dataset.epoch;
+
+  const sectors = computeAllSectors();
+  const sector = sectors.find(s => s.sector === sectorName);
+  if (!sector) return;
+
+  const stockList = sector.stocks[epochKey];
+
+  const title = document.getElementById("breakoutTitle");
+  const body = document.getElementById("breakoutBody");
+  if (!title || !body) return;
+
+  title.textContent = `${sectorName} — ${epochKey.toUpperCase()} Stocks`;
+  body.innerHTML = "";
+
+  stockList.forEach(st => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${st.ticker}</td>
+      <td>${st.shares ?? "-"}</td>
+      <td>${formatNumber(st.price)}</td>
+      <td>${formatNumber(st.actual)}</td>
+      <td>${formatNumber(st.projected ?? 0)}</td>
+    `;
+    body.appendChild(tr);
+  });
+
+  const modalEl = document.getElementById("breakoutModal");
+  if (!modalEl) return;
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  modal.show();
+}
+
+// ---- INIT ---------------------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", () => {
+  const loadBtn = document.getElementById("loadBtn");
+  if (loadBtn) {
+    loadBtn.addEventListener("click", buildTable);
+  }
+  // Initial render
+  buildTable();
+});
