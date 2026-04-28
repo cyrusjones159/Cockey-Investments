@@ -34,7 +34,7 @@
     }
     .ratios-cell {
       white-space: nowrap;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
     tfoot tr td {
       font-weight: 600;
@@ -47,7 +47,7 @@
     <h1 class="mb-4">Portfolio Facets</h1>
 
     <button id="loadBtn" class="btn btn-primary mb-3">
-      Load Portfolio
+      Reload Portfolio
     </button>
 
     <div class="table-responsive">
@@ -57,19 +57,19 @@
             <th scope="col">Sector</th>
             <th scope="col">
               Epoch 1<br />
-              <small>epoch count | target | actual | projected</small>
+              <small>count | target | actual | projected</small>
             </th>
             <th scope="col">
               Epoch 2<br />
-              <small>epoch count | target | actual | projected</small>
+              <small>count | target | actual | projected</small>
             </th>
             <th scope="col">
               Epoch 3<br />
-              <small>epoch count | target | actual | projected</small>
+              <small>count | target | actual | projected</small>
             </th>
             <th scope="col">
               Ratios<br />
-              <small>E2/E1 &nbsp; E3/E1</small>
+              <small>E2/E1 | E3/E1 | E2/H | E3/H</small>
             </th>
           </tr>
         </thead>
@@ -121,7 +121,7 @@
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Portfolio logic (all JS lives here) -->
+  <!-- Portfolio logic -->
   <script src="portfolio.js"></script>
 </body>
 </html>
