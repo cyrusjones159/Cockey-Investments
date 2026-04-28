@@ -387,7 +387,31 @@ function buildTable() {
   tdRatiosTotal.textContent = "—";
   trowTotals.appendChild(tdRatiosTotal);
 }
+  trowTotals.appendChild(tdRatiosTotal);
+}
 
+function onEpochButtonClick(e) {
+  const sectorName = e.currentTarget.dataset.sector;
+  const epochKey = e.currentTarget.dataset.epoch;
+
+  const sectors = computeAllSectors();
+  const sector = sectors.find(s => s.sector === sectorName);
+  if (!sector) return;
+
+  const stockList = sector.stocks[epochKey];
+
+  const title = document.getElementById("breakoutTitle");
+  const body = document.getElementById("breakoutBody");
+
+  title.textContent = `${sectorName} — ${epochKey.toUpperCase()} Stocks`;
+  body.innerHTML = "";
+
+  stockList.forEach(st => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${st.ticker}</td>
+      <td>${st.shares}</td>
+      <td>${formatNumber(st.price)}</td>
       <td>${formatNumber(st.actual)}</td>
       <td>${formatNumber(st.projected ?? 0)}</td>
     `;
