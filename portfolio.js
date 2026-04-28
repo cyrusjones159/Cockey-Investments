@@ -387,8 +387,9 @@ function buildTable() {
   tdRatiosTotal.textContent = "—";
   trowTotals.appendChild(tdRatiosTotal);
 }
-  trowTotals.appendChild(tdRatiosTotal);
-}
+
+
+// ---------------- MODAL HANDLER ----------------
 
 function onEpochButtonClick(e) {
   const sectorName = e.currentTarget.dataset.sector;
@@ -424,6 +425,7 @@ function onEpochButtonClick(e) {
   modal.show();
 }
 
+
 // ---------------- DATA LOADING ----------------
 
 async function loadSectorData() {
@@ -444,7 +446,6 @@ async function loadSectorData() {
       return;
     }
 
-    // Group by sector (lowercase)
     SECTOR_DATA = {
       autos: data.filter(x => (x.sector || "").toLowerCase() === "autos"),
       financials: data.filter(x => (x.sector || "").toLowerCase() === "financials"),
@@ -459,6 +460,7 @@ async function loadSectorData() {
   }
 }
 
+
 // ---------------- INIT ----------------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -469,6 +471,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Initial load
   loadSectorData();
 });
