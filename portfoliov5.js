@@ -1,17 +1,21 @@
 // ---- CONFIG -------------------------------------------------------------
 
 const TOTAL_PORTFOLIO_TARGET = 50000;
-
-const EPOCH_GROWTH = {
-  epoch1: 1.10,
-  epoch2: 1.20,
-  epoch3: 1.30
-};
+const FIXED_SECTOR_TARGET = 10000;
 
 // IMPORTANT:
 // Replace these arrays with your real JSON-loaded arrays.
 // Each item must match your JSON structure:
-// { ticker, sector, priceEnd, totalspend, totalreturn, selected }
+// {
+//   ticker,
+//   sector,
+//   priceStart,
+//   priceEnd,
+//   totalspend,
+//   totalreturn,
+//   totalfiveyearview,
+//   selected
+// }
 const SECTOR_DATA = {
   AUTOS: [],
   FINANCIALS: [],
@@ -56,104 +60,225 @@ function normalizeSelected(val) {
   return String(val).toLowerCase() === "true";
 }
 
-// ---- CORE CALCULATION ---------------------------------------------------
+function safePrice(t) {
+  const p = t.priceEnd ?? t.price ?? 0;
+  return p > 0 ? p : 0;
+}
 
-function computeSectorAllocation(displayName, tickers, growthFactors) {
-  // ---- EPOCH 1: all stocks ----
-  const stocksEpoch1 = tickers;
+function safeFiveYear(t) {
+  return t.totalfiveyearview ?? 0;
+}
 
-  // ---- EPOCH 2: selected stocks ----
-  const stocksEpoch2 = tickers.filter(t => normalizeSelected(t.selected));
+// ---- CORE PER-EPOCH BUILDERS -------------------------------------------
 
-  // ---- EPOCH 3: top 10 selected by totalreturn ----
-  const stocksEpoch3 = [...stocksEpoch2]
+// For Autos, Financials, Health, Media (fixed 10k target, CEILING)
+function buildEpochStocksFixedTarget(tickers, sectorTarget) {
+  const N = tickers.length;
+  if (N === 0) {
+    return {
+      stocks: [],
+      count: 0,
+      actual: 0,
+      projected: 0
+    };
+  }
+
+  const perStockTarget = sectorTarget / N;
+  let actualSum = 0;
+  let projectedSum = 0;
+
+  const stocks = tickers.map(t => {
+    const price = safePrice(t);
+    let shares = 0;
+    if (price > 0) {
+      shares = Math.ceil(perStockTarget / price);
+    }
+    const actual = shares * price;
+    const projected = shares * safeFiveYear(t);
+
+    actualSum += actual;
+    projectedSum += projected;
+
+    return {
+      ...t,
+      price,
+      shares,
+      actual,
+      projected
+    };
+  });
+
+  return {
+    stocks,
+    count: N,
+    actual: actualSum,
+    projected: projectedSum
+  };
+}
+
+// For REITS (balance sector, FLOOR)
+function buildEpochStocksReits(tickers, reitsTarget) {
+  const N = tickers.length;
+  if (N === 0 || reitsTarget <= 0) {
+    return {
+      stocks: [],
+      count: 0,
+      actual: 0,
+      projected: 0
+    };
+  }
+
+  const perStockTarget = reitsTarget / N;
+  let actualSum = 0;
+  let projectedSum = 0;
+
+  const stocks = tickers.map(t => {
+    const price = safePrice(t);
+    let shares = 0;
+    if (price > 0) {
+      shares = Math.floor(perStockTarget / price);
+      if (shares < 0) shares = 0;
+    }
+    const actual = shares * price;
+    const projected = shares * safeFiveYear(t);
+
+    actualSum += actual;
+    projectedSum += projected;
+
+    return {
+      ...t,
+      price,
+      shares,
+      actual,
+      projected
+    };
+  });
+
+  return {
+    stocks,
+    count: N,
+    actual: actualSum,
+    projected: projectedSum
+  };
+}
+
+// ---- SECTOR BUILDERS ----------------------------------------------------
+
+// Fixed 10k sectors: Autos, Financials, Health, Media
+function computeFixedSector(displayName, tickers) {
+  // Epoch 1: all
+  const epoch1Tickers = tickers;
+
+  // Epoch 2: selected
+  const epoch2Tickers = tickers.filter(t => normalizeSelected(t.selected));
+
+  // Epoch 3: top 10 selected by totalreturn
+  const epoch3Tickers = [...epoch2Tickers]
     .sort((a, b) => b.totalreturn - a.totalreturn)
     .slice(0, 10);
 
-  // ---- Epoch counts ----
-  const epochCounts = {
-    epoch1: stocksEpoch1.length,
-    epoch2: stocksEpoch2.length,
-    epoch3: stocksEpoch3.length
-  };
+  const e1 = buildEpochStocksFixedTarget(epoch1Tickers, FIXED_SECTOR_TARGET);
+  const e2 = buildEpochStocksFixedTarget(epoch2Tickers, FIXED_SECTOR_TARGET);
+  const e3 = buildEpochStocksFixedTarget(epoch3Tickers, FIXED_SECTOR_TARGET);
 
-  // ---- Sector label with total stocks ----
-  const sectorLabel = `${displayName} (${stocksEpoch1.length})`;
-
-  // ---- Compute actual cost for each epoch ----
-  function computeActual(list) {
-    return list.reduce((sum, t) => sum + (t.totalspend ?? 0), 0);
-  }
-
-  const actual1 = computeActual(stocksEpoch1);
-  const actual2 = computeActual(stocksEpoch2);
-  const actual3 = computeActual(stocksEpoch3);
-
-  // ---- Projected values ----
-  const projected = {
-    epoch1: actual1 * growthFactors.epoch1,
-    epoch2: actual2 * growthFactors.epoch2,
-    epoch3: actual3 * growthFactors.epoch3
-  };
-
-  // ---- Enrich stocks for modal ----
-  function enrich(list) {
-    return list.map(t => ({
-      ...t,
-      ticker: t.ticker,
-      price: t.priceEnd ?? t.price ?? 0,
-      shares:
-        t.shares ??
-        (t.totalspend && (t.priceEnd || t.price)
-          ? t.totalspend / (t.priceEnd || t.price)
-          : undefined),
-      actual: t.totalspend ?? 0
-    }));
-  }
+  const sectorLabel = `${displayName} (${epoch1Tickers.length})`;
 
   return {
     sector: sectorLabel,
-    epochCounts,
-    actual: {
-      epoch1: actual1,
-      epoch2: actual2,
-      epoch3: actual3
+    target: FIXED_SECTOR_TARGET,
+    epochCounts: {
+      epoch1: e1.count,
+      epoch2: e2.count,
+      epoch3: e3.count
     },
-    projected,
+    actual: {
+      epoch1: e1.actual,
+      epoch2: e2.actual,
+      epoch3: e3.actual
+    },
+    projected: {
+      epoch1: e1.projected,
+      epoch2: e2.projected,
+      epoch3: e3.projected
+    },
     stocks: {
-      epoch1: enrich(stocksEpoch1),
-      epoch2: enrich(stocksEpoch2),
-      epoch3: enrich(stocksEpoch3)
+      epoch1: e1.stocks,
+      epoch2: e2.stocks,
+      epoch3: e3.stocks
     }
   };
 }
 
-function computeAllSectors() {
-  const growth = EPOCH_GROWTH;
+// REITS: balance sector
+function computeReitsSector(displayName, tickers, baseSectors) {
+  // Epoch 1: all
+  const epoch1Tickers = tickers;
 
-  // Build each sector
-  const autos       = computeSectorAllocation("Autos",       SECTOR_DATA.AUTOS,       growth);
-  const financials  = computeSectorAllocation("Financials",  SECTOR_DATA.FINANCIALS,  growth);
-  const media       = computeSectorAllocation("Media",       SECTOR_DATA.MEDIA,       growth);
-  const health      = computeSectorAllocation("Health",      SECTOR_DATA.HEALTH,      growth);
-  const reits       = computeSectorAllocation("REITs",       SECTOR_DATA.REITS,       growth);
+  // Epoch 2: selected
+  const epoch2Tickers = tickers.filter(t => normalizeSelected(t.selected));
 
-  const baseSectors = [autos, financials, media, health, reits];
+  // Epoch 3: top 10 selected by totalreturn
+  const epoch3Tickers = [...epoch2Tickers]
+    .sort((a, b) => b.totalreturn - a.totalreturn)
+    .slice(0, 10);
 
-  // ---- CASH TRUE-UP PER EPOCH ----
-  const cashActual = {
-    epoch1: 0,
-    epoch2: 0,
-    epoch3: 0
+  function totalActualOfBase(epochKey) {
+    return baseSectors.reduce((sum, s) => sum + s.actual[epochKey], 0);
+  }
+
+  const reitsTargets = {
+    epoch1: TOTAL_PORTFOLIO_TARGET - totalActualOfBase("epoch1"),
+    epoch2: TOTAL_PORTFOLIO_TARGET - totalActualOfBase("epoch2"),
+    epoch3: TOTAL_PORTFOLIO_TARGET - totalActualOfBase("epoch3")
   };
 
-  ["epoch1", "epoch2", "epoch3"].forEach(epochKey => {
-    const totalActual = baseSectors.reduce(
+  const e1 = buildEpochStocksReits(epoch1Tickers, reitsTargets.epoch1);
+  const e2 = buildEpochStocksReits(epoch2Tickers, reitsTargets.epoch2);
+  const e3 = buildEpochStocksReits(epoch3Tickers, reitsTargets.epoch3);
+
+  const sectorLabel = `${displayName} (${epoch1Tickers.length})`;
+
+  return {
+    sector: sectorLabel,
+    // Display target is always 10k, even though true target is smaller
+    target: FIXED_SECTOR_TARGET,
+    epochCounts: {
+      epoch1: e1.count,
+      epoch2: e2.count,
+      epoch3: e3.count
+    },
+    actual: {
+      epoch1: e1.actual,
+      epoch2: e2.actual,
+      epoch3: e3.actual
+    },
+    projected: {
+      epoch1: e1.projected,
+      epoch2: e2.projected,
+      epoch3: e3.projected
+    },
+    stocks: {
+      epoch1: e1.stocks,
+      epoch2: e2.stocks,
+      epoch3: e3.stocks
+    }
+  };
+}
+
+// CASH: leftover
+function computeCashSector(baseSectorsPlusReits) {
+  function totalActual(epochKey) {
+    return baseSectorsPlusReits.reduce(
       (sum, s) => sum + s.actual[epochKey],
       0
     );
-    cashActual[epochKey] = TOTAL_PORTFOLIO_TARGET - totalActual;
-  });
+  }
+
+  const cashActual = {
+    epoch1: TOTAL_PORTFOLIO_TARGET - totalActual("epoch1"),
+    epoch2: TOTAL_PORTFOLIO_TARGET - totalActual("epoch2"),
+    epoch3: TOTAL_PORTFOLIO_TARGET - totalActual("epoch3")
+  };
 
   const cashProjected = {
     epoch1: cashActual.epoch1,
@@ -166,31 +291,55 @@ function computeAllSectors() {
       ticker: "CASH",
       price: 1,
       shares: cashActual.epoch1,
-      actual: cashActual.epoch1
+      actual: cashActual.epoch1,
+      projected: cashProjected.epoch1
     }],
     epoch2: [{
       ticker: "CASH",
       price: 1,
       shares: cashActual.epoch2,
-      actual: cashActual.epoch2
+      actual: cashActual.epoch2,
+      projected: cashProjected.epoch2
     }],
     epoch3: [{
       ticker: "CASH",
       price: 1,
       shares: cashActual.epoch3,
-      actual: cashActual.epoch3
+      actual: cashActual.epoch3,
+      projected: cashProjected.epoch3
     }]
   };
 
-  const cash = {
+  return {
     sector: "Cash (1)",
+    target: cashActual.epoch1, // display as its own amount
     epochCounts: { epoch1: 1, epoch2: 1, epoch3: 1 },
     actual: cashActual,
     projected: cashProjected,
     stocks: cashStocks
   };
+}
 
-  return [...baseSectors, cash];
+// ---- PUBLIC API USED BY HTML -------------------------------------------
+
+function computeAllSectors() {
+  // 1–4: fixed 10k sectors
+  const autos      = computeFixedSector("Autos",      SECTOR_DATA.AUTOS);
+  const financials = computeFixedSector("Financials", SECTOR_DATA.FINANCIALS);
+  const health     = computeFixedSector("Health",     SECTOR_DATA.HEALTH);
+  const media      = computeFixedSector("Media",      SECTOR_DATA.MEDIA);
+
+  const baseSectors = [autos, financials, health, media];
+
+  // 5: REITS as balance
+  const reits = computeReitsSector("REITs", SECTOR_DATA.REITS, baseSectors);
+
+  const basePlusReits = [...baseSectors, reits];
+
+  // 6: CASH as leftover
+  const cash = computeCashSector(basePlusReits);
+
+  return [...basePlusReits, cash];
 }
 
 function computeTotals(sectors) {
