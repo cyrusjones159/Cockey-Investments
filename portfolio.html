@@ -1,10 +1,331 @@
-<HTML>
+<!DOCTYPE html>
+<html>
 <head>
-  
+    <meta charset="UTF-8">
+    <title>portfolio.html</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .epoch-col { min-width: 260px; }
+        .sub-label { font-size: 0.8rem; color: #555; }
+        .sub-value { text-align: right; }
+        .sector-label { font-weight: 600; }
+        .ratio-text { font-size: 0.85rem; line-height: 1.2; }
+    </style>
 </head>
-<body>
-  <br><br>
-  <div align="center"><H3>Portfolio.html is not yet implemented</H3></div>
- 
-</body> 
-</HTML>
+
+<body class="bg-light">
+<div class="container py-4">
+
+    <h2 class="mb-4">Portfolio Epoch Report</h2>
+
+    <button id="loadBtn" class="btn btn-primary mb-4">Load Portfolio Data</button>
+
+    <div id="status" class="mb-3"></div>
+
+    <table class="table table-bordered table-striped align-middle">
+        <thead class="table-dark">
+        <tr>
+            <th>Sector</th>
+
+            <th class="text-center epoch-col">
+                Epoch 1
+                <div class="row mt-1">
+                    <div class="col sub-label">Invested</div>
+                    <div class="col sub-label">Current</div>
+                    <div class="col sub-label">Projected</div>
+                </div>
+            </th>
+
+            <th class="text-center epoch-col">
+                Epoch 2
+                <div class="row mt-1">
+                    <div class="col sub-label">Invested</div>
+                    <div class="col sub-label">Current</div>
+                    <div class="col sub-label">Projected</div>
+                </div>
+            </th>
+
+            <th class="text-center epoch-col">
+                Epoch 3
+                <div class="row mt-1">
+                    <div class="col sub-label">Invested</div>
+                    <div class="col sub-label">Current</div>
+                    <div class="col sub-label">Projected</div>
+                </div>
+            </th>
+
+            <th class="text-center">
+                Ratios
+                <div class="sub-label">Epoch2/Epoch1 &amp; Epoch3/Epoch1</div>
+            </th>
+        </tr>
+        </thead>
+
+        <tbody id="sectorRows"></tbody>
+    </table>
+</div>
+
+<script>
+// ------------------------------------------------------
+// CONFIG
+// ------------------------------------------------------
+const API_URL = "https://cockyinvestments-ghehe0a8a7cge7fk.westus3-01.azurewebsites.net/api/Sectorsummaries";
+const SECTORS = ["autos", "financials", "media", "health", "reits"];
+const TARGET_PER_SECTOR = 10000;
+
+// ------------------------------------------------------
+// HELPERS
+// ------------------------------------------------------
+function formatMoney(v) {
+    return "$" + v.toFixed(2);
+}
+
+function formatRatio(num) {
+    if (!isFinite(num) || isNaN(num)) return "N/A";
+    return num.toFixed(2);
+}
+
+function computeProjected(currentValue, stock) {
+    const growth = (stock.totalfiveyearview || 0) / 100;
+    return currentValue * (1 + growth);
+}
+
+function groupBySector(items) {
+    const groups = {};
+    SECTORS.forEach(s => groups[s] = []);
+    items.forEach(item => {
+        if (groups[item.sector]) groups[item.sector].push(item);
+    });
+    return groups;
+}
+
+// ------------------------------------------------------
+// EPOCH 1 & 2 (floor shares, 10K budget)
+// ------------------------------------------------------
+function computeEpochFloor(sectorItems) {
+    if (!sectorItems || sectorItems.length === 0)
+        return { invested: 0, current: 0, projected: 0, cash: TARGET_PER_SECTOR };
+
+    let remaining = TARGET_PER_SECTOR;
+    let totalCurrent = 0;
+    let totalProjected = 0;
+
+    sectorItems.forEach(stock => {
+        const price = stock.priceEnd || 0;
+        if (price <= 0 || remaining <= 0) return;
+
+        const shares = Math.floor(remaining / price);
+        if (shares <= 0) return;
+
+        const invested = shares * price;
+        remaining -= invested;
+
+        totalCurrent += invested;
+        totalProjected += computeProjected(invested, stock);
+    });
+
+    return {
+        invested: TARGET_PER_SECTOR - remaining,
+        current: totalCurrent,
+        projected: totalProjected,
+        cash: remaining
+    };
+}
+
+// ------------------------------------------------------
+// EPOCH 3 (top 10, ceil shares, overshoot allowed)
+// ------------------------------------------------------
+function computeEpoch3Sector(sectorItems) {
+    if (!sectorItems || sectorItems.length === 0)
+        return { invested: 0, current: 0, projected: 0, overshoot: 0 };
+
+    const sorted = [...sectorItems].sort((a, b) => (b.totalreturn || 0) - (a.totalreturn || 0));
+    const chosen = sorted.slice(0, Math.min(10, sorted.length));
+
+    const perStockAlloc = TARGET_PER_SECTOR / chosen.length;
+
+    let totalInvested = 0;
+    let totalProjected = 0;
+
+    chosen.forEach(stock => {
+        const price = stock.priceEnd || 0;
+        if (price <= 0) return;
+
+        const shares = Math.ceil(perStockAlloc / price);
+        const invested = shares * price;
+
+        totalInvested += invested;
+        totalProjected += computeProjected(invested, stock);
+    });
+
+    const overshoot = Math.max(0, totalInvested - TARGET_PER_SECTOR);
+
+    return {
+        invested: totalInvested,
+        current: totalInvested,
+        projected: totalProjected,
+        overshoot: overshoot
+    };
+}
+
+// ------------------------------------------------------
+// EPOCH 3 REITS (leftover budget)
+// ------------------------------------------------------
+function computeEpoch3Reits(reitItems, totalOvershoot) {
+    const budget = Math.max(0, TARGET_PER_SECTOR - totalOvershoot);
+
+    if (!reitItems || reitItems.length === 0)
+        return { invested: 0, current: 0, projected: 0, cash: budget };
+
+    let remaining = budget;
+    let totalCurrent = 0;
+    let totalProjected = 0;
+
+    reitItems.forEach(stock => {
+        const price = stock.priceEnd || 0;
+        if (price <= 0 || remaining <= 0) return;
+
+        const shares = Math.floor(remaining / price);
+        if (shares <= 0) return;
+
+        const invested = shares * price;
+        remaining -= invested;
+
+        totalCurrent += invested;
+        totalProjected += computeProjected(invested, stock);
+    });
+
+    return {
+        invested: budget - remaining,
+        current: totalCurrent,
+        projected: totalProjected,
+        cash: remaining
+    };
+}
+
+// ------------------------------------------------------
+// BUILD TABLE
+// ------------------------------------------------------
+function buildTable(data) {
+    const filtered = data.filter(x => x.sector !== "Financials" && x.id <= 200);
+
+    const groupsAll = groupBySector(filtered);
+    const groupsSelected = groupBySector(filtered.filter(x => x.selected === "True"));
+
+    const epoch1 = {};
+    const epoch2 = {};
+    const epoch3 = {};
+
+    // Epoch1 & Epoch2 for first 4 sectors
+    ["autos", "financials", "media", "health"].forEach(sec => {
+        epoch1[sec] = computeEpochFloor(groupsAll[sec]);
+        epoch2[sec] = computeEpochFloor(groupsSelected[sec]);
+    });
+
+    // REITs for Epoch1 & Epoch2
+    epoch1["reits"] = computeEpochFloor(groupsAll["reits"]);
+    epoch2["reits"] = computeEpochFloor(groupsSelected["reits"]);
+
+    // Epoch3 for first 4 sectors
+    let totalOvershoot = 0;
+    ["autos", "financials", "media", "health"].forEach(sec => {
+        const res = computeEpoch3Sector(groupsAll[sec]);
+        epoch3[sec] = res;
+        totalOvershoot += res.overshoot || 0;
+    });
+
+    // Epoch3 REITs
+    epoch3["reits"] = computeEpoch3Reits(groupsAll["reits"], totalOvershoot);
+
+    // Render table
+    const tbody = document.getElementById("sectorRows");
+    tbody.innerHTML = "";
+
+    SECTORS.forEach(sec => {
+        const e1 = epoch1[sec];
+        const e2 = epoch2[sec];
+        const e3 = epoch3[sec];
+
+        const row = document.createElement("tr");
+
+        // Sector label
+        const tdSector = document.createElement("td");
+        tdSector.classList.add("sector-label");
+        tdSector.textContent = sec.toUpperCase();
+        row.appendChild(tdSector);
+
+        // Epoch1
+        const tdE1 = document.createElement("td");
+        tdE1.innerHTML = `
+            <div class="row">
+                <div class="col sub-value">${formatMoney(e1.invested)}</div>
+                <div class="col sub-value">${formatMoney(e1.current)}</div>
+                <div class="col sub-value">${formatMoney(e1.projected)}</div>
+            </div>
+            ${sec === "reits" ? `<div class="mt-1 sub-label">Cash: ${formatMoney(e1.cash)}</div>` : ""}
+        `;
+        row.appendChild(tdE1);
+
+        // Epoch2
+        const tdE2 = document.createElement("td");
+        tdE2.innerHTML = `
+            <div class="row">
+                <div class="col sub-value">${formatMoney(e2.invested)}</div>
+                <div class="col sub-value">${formatMoney(e2.current)}</div>
+                <div class="col sub-value">${formatMoney(e2.projected)}</div>
+            </div>
+            ${sec === "reits" ? `<div class="mt-1 sub-label">Cash: ${formatMoney(e2.cash)}</div>` : ""}
+        `;
+        row.appendChild(tdE2);
+
+        // Epoch3
+        const tdE3 = document.createElement("td");
+        tdE3.innerHTML = `
+            <div class="row">
+                <div class="col sub-value">${formatMoney(e3.invested)}</div>
+                <div class="col sub-value">${formatMoney(e3.current)}</div>
+                <div class="col sub-value">${formatMoney(e3.projected)}</div>
+            </div>
+            ${sec === "reits" ? `<div class="mt-1 sub-label">Cash: ${formatMoney(e3.cash)}</div>` : ""}
+        `;
+        row.appendChild(tdE3);
+
+        // Ratios
+        const tdRatio = document.createElement("td");
+        const r21 = e1.projected > 0 ? e2.projected / e1.projected : NaN;
+        const r31 = e1.projected > 0 ? e3.projected / e1.projected : NaN;
+
+        tdRatio.innerHTML = `
+            <div class="ratio-text">E2/E1: ${formatRatio(r21)}</div>
+            <div class="ratio-text">E3/E1: ${formatRatio(r31)}</div>
+        `;
+        row.appendChild(tdRatio);
+
+        tbody.appendChild(row);
+    });
+}
+
+// ------------------------------------------------------
+// FETCH BUTTON
+// ------------------------------------------------------
+document.getElementById("loadBtn").addEventListener("click", async () => {
+    const status = document.getElementById("status");
+    status.innerHTML = "Loading data...";
+
+    try {
+        const response = await fetch(API_URL);
+        const json = await response.json();
+
+        status.innerHTML = "<span class='text-success'>Data loaded successfully.</span>";
+        buildTable(json);
+
+    } catch (err) {
+        status.innerHTML = "<span class='text-danger'>Failed to load data.</span>";
+        console.error(err);
+    }
+});
+</script>
+
+</body>
+</html>
