@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Portfolio Facets</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Bootstrap 5 -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      padding: 20px;
+    }
+    .epoch-cell {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 0.9rem;
+    }
+    .epoch-triplet {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr;
+      column-gap: 0.5rem;
+      white-space: nowrap;
+    }
+    .epoch-triplet span {
+      text-align: right;
+    }
+    .epoch-triplet span:first-child {
+      text-align: left;
+    }
+    .ratios-cell {
+      white-space: nowrap;
+      font-size: 0.85rem;
+    }
+    tfoot tr td {
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-4">Portfolio Facets</h1>
+
+    <button id="loadBtn" class="btn btn-primary mb-3">
+      Load Portfolio Data
+    </button>
+
+    <div class="table-responsive">
+      <table class="table table-striped table-bordered align-middle">
+        <thead class="table-light">
+          <tr>
+            <th scope="col">Sector</th>
+            <th scope="col">Epoch 1<br /><small>count | invested | projected</small></th>
+            <th scope="col">Epoch 2<br /><small>count | invested | projected</small></th>
+            <th scope="col">Epoch 3<br /><small>count | invested | projected</small></th>
+            <th scope="col">Ratios<br /><small>E2/E1 &nbsp; E3/E1</small></th>
+          </tr>
+        </thead>
+        <tbody id="portfolioBody">
+          <!-- rows injected by JS -->
+        </tbody>
+        <tfoot>
+          <tr id="totalsRow">
+            <!-- totals injected by JS -->
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // ---- CONFIG / HELPERS ----------------------------------------------------
+
+    const TARGET_PORTFOLIO_TOTAL = 50000;
+    const REITS_TARGET = 10000;
+
+    function formatNumber(n) {
+      return n.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    }
+
+    function ratio(a, b) {
+      if (!b || b === 0) return "—";
+      return (a / b).toFixed(2);
+    }
+
+    function makeEpochTriplet(label, invested, projected) {
+      return `
+        <div class="epoch-triplet">
+          <span>${label}</span>
+          <span>${formatNumber(invested)}</span>
+          <span>${formatNumber(projected)}</span>
+        </div>
+      `;
+    }
+
+    // ---- MOCK FETCH (replace with real API if you have one) ------------------
+    // Expected shape per sector:
+    // {
+    //   sector: "AUTOS",
+    //   epoch1: { count: 18, invested: 10000, projected: 13800 },
+    //   epoch2: { count: 7,  invested: 10000, projected: 11200 },
+    //   epoch3: { count: 10, invested: 10000, projected: 13900 }
+    // }
+
+    async function fetchPortfolioData() {
+      // Replace this with a real fetch if desired:
+      // const res = await fetch("/api/portfolio");
+      // return await res.json();
+
+      // Sample data for structure
+      return [
+        {
+          sector: "AUTOS",
+          epoch1: { countLabel: "18 stocks", invested: 10000, projected: 13800 },
+          epoch2: { countLabel: "7 stocks", invested: 10000, projected: 11200 },
+          epoch3: { countLabel: "10 stocks", invested: 10000, projected: 13900 }
+        },
+        {
+          sector: "FINANCIALS",
+          epoch1: { countLabel: "20 stocks", invested: 10000, projected: 13500 },
+          epoch2: { countLabel: "9 stocks", invested: 10000, projected: 11800 },
+          epoch3: { countLabel: "10 stocks", invested: 10000, projected: 14000 }
+        },
+        {
+          sector: "MEDIA",
+          epoch1: { countLabel: "15 stocks", invested: 10000, projected: 13200 },
+          epoch2: { countLabel: "8 stocks", invested: 10000, projected: 11500 },
+          epoch3: { countLabel: "10 stocks", invested: 10000, projected: 13700 }
+        },
+        {
+          sector: "HEALTH",
+          epoch1: { countLabel: "17 stocks", invested: 10000, projected: 13600 },
+          epoch2: { countLabel: "8 stocks", invested: 10000, projected: 11600 },
+          epoch3: { countLabel: "10 stocks", invested: 10000, projected: 14100 }
+        },
+        {
+          sector: "REITS",
+          epoch1: { countLabel: "12 stocks", invested: 9200, projected: 11000 },
+          epoch2: { countLabel: "6 stocks", invested: 9200, projected: 10800 },
+          epoch3: { countLabel: "8 stocks", invested: 9200, projected: 11200 }
+        }
+      ];
+    }
+
+    // ---- CORE LOGIC ----------------------------------------------------------
+
+    function applyReitsTrueUpAndCash(sectors) {
+      // Find REITS
+      const reits = sectors.find(s => s.sector.toUpperCase() === "REITS");
+      let reitsInvested1 = reits ? reits.epoch1.invested : 0;
+
+      // True-up REITS to REITS_TARGET by moving difference into CASH
+      const cashInvested1 = REITS_TARGET - reitsInvested1;
+      if (reits) {
+        reits.epoch1.invested = REITS_TARGET;
+        // scale projected proportionally if you want; here we just bump by same delta
+        const delta = REITS_TARGET - reitsInvested1;
+        reits.epoch1.projected += delta;
+      }
+
+      // Compute totals invested across sectors (Epoch1) BEFORE CASH
+      const totalInvested1BeforeCash = sectors.reduce(
+        (sum, s) => sum + s.epoch1.invested,
+        0
+      );
+
+      const cashLeftover = TARGET_PORTFOLIO_TOTAL - totalInvested1BeforeCash;
+
+      const cashSector = {
+        sector: "CASH (TrueUp to 50K)",
+        epoch1: {
+          countLabel: "1 share",
+          invested: cashLeftover,
+          projected: cashLeftover
+        },
+        epoch2: {
+          countLabel: "1 share",
+          invested: cashLeftover,
+          projected: cashLeftover
+        },
+        epoch3: {
+          countLabel: "1 share",
+          invested: cashLeftover,
+          projected: cashLeftover
+        },
+        isCash: true
+      };
+
+      return [...sectors, cashSector];
+    }
+
+    function computeTotals(sectors) {
+      const totals = {
+        epoch1: { invested: 0, projected: 0 },
+        epoch2: { invested: 0, projected: 0 },
+        epoch3: { invested: 0, projected: 0 }
+      };
+
+      sectors.forEach(s => {
+        totals.epoch1.invested += s.epoch1.invested;
+        totals.epoch1.projected += s.epoch1.projected;
+        totals.epoch2.invested += s.epoch2.invested;
+        totals.epoch2.projected += s.epoch2.projected;
+        totals.epoch3.invested += s.epoch3.invested;
+        totals.epoch3.projected += s.epoch3.projected;
+      });
+
+      return totals;
+    }
+
+    function buildTable(sectors) {
+      const tbody = document.getElementById("portfolioBody");
+      const trowTotals = document.getElementById("totalsRow");
+      tbody.innerHTML = "";
+      trowTotals.innerHTML = "";
+
+      const sectorsWithCash = applyReitsTrueUpAndCash(sectors);
+      const totals = computeTotals(sectorsWithCash);
+
+      sectorsWithCash.forEach(s => {
+        const tr = document.createElement("tr");
+
+        // Sector name
+        const tdSector = document.createElement("td");
+        tdSector.textContent = s.sector;
+        tr.appendChild(tdSector);
+
+        // Epoch1
+        const tdE1 = document.createElement("td");
+        tdE1.className = "epoch-cell";
+        tdE1.innerHTML = makeEpochTriplet(
+          s.epoch1.countLabel,
+          s.epoch1.invested,
+          s.epoch1.projected
+        );
+        tr.appendChild(tdE1);
+
+        // Epoch2
+        const tdE2 = document.createElement("td");
+        tdE2.className = "epoch-cell";
+        tdE2.innerHTML = makeEpochTriplet(
+          s.epoch2.countLabel,
+          s.epoch2.invested,
+          s.epoch2.projected
+        );
+        tr.appendChild(tdE2);
+
+        // Epoch3
+        const tdE3 = document.createElement("td");
+        tdE3.className = "epoch-cell";
+        tdE3.innerHTML = makeEpochTriplet(
+          s.epoch3.countLabel,
+          s.epoch3.invested,
+          s.epoch3.projected
+        );
+        tr.appendChild(tdE3);
+
+        // Ratios
+        const tdRatios = document.createElement("td");
+        tdRatios.className = "ratios-cell";
+
+        if (s.isCash) {
+          tdRatios.textContent = "N/A";
+        } else {
+          const rE2E1 = ratio(s.epoch2.projected, s.epoch1.projected);
+          const rE3E1 = ratio(s.epoch3.projected, s.epoch1.projected);
+          tdRatios.innerHTML = `E2/E1: ${rE2E1}&nbsp;&nbsp;E3/E1: ${rE3E1}`;
+        }
+
+        tr.appendChild(tdRatios);
+
+        tbody.appendChild(tr);
+      });
+
+      // Totals row: 3-subcolumn layout in each epoch cell
+      const tdLabel = document.createElement("td");
+      tdLabel.textContent = "TOTALS";
+      trowTotals.appendChild(tdLabel);
+
+      const tdE1Total = document.createElement("td");
+      tdE1Total.className = "epoch-cell";
+      tdE1Total.innerHTML = makeEpochTriplet(
+        "Totals",
+        totals.epoch1.invested,
+        totals.epoch1.projected
+      );
+      trowTotals.appendChild(tdE1Total);
+
+      const tdE2Total = document.createElement("td");
+      tdE2Total.className = "epoch-cell";
+      tdE2Total.innerHTML = makeEpochTriplet(
+        "Totals",
+        totals.epoch2.invested,
+        totals.epoch2.projected
+      );
+      trowTotals.appendChild(tdE2Total);
+
+      const tdE3Total = document.createElement("td");
+      tdE3Total.className = "epoch-cell";
+      tdE3Total.innerHTML = makeEpochTriplet(
+        "Totals",
+        totals.epoch3.invested,
+        totals.epoch3.projected
+      );
+      trowTotals.appendChild(tdE3Total);
+
+      const tdRatiosTotal = document.createElement("td");
+      tdRatiosTotal.textContent = "—";
+      trowTotals.appendChild(tdRatiosTotal);
+    }
+
+    // ---- INIT ----------------------------------------------------------------
+
+    document.getElementById("loadBtn").addEventListener("click", async () => {
+      const data = await fetchPortfolioData();
+      buildTable(data);
+    });
+
+    // Optional: auto-load on page open
+    (async () => {
+      const data = await fetchPortfolioData();
+      buildTable(data);
+    })();
+  </script>
+</body>
+</html>
